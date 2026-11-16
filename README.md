@@ -137,6 +137,15 @@ docker compose --profile deploy up -d
 
 多阶段构建，前端产物由后端同源托管，访问 `http://localhost:7302` 即可。
 
+### 持续部署（CI/CD）
+
+合并到 `main` 后，GitHub Actions 会经 Cloudflare Tunnel 自动部署到家里的一台 Mac Mini：
+
+- `.github/workflows/ci.yml`：PR 上跑后端 ruff 检查与前端 lint / build
+- `.github/workflows/deploy.yml`：`main` 触发构建、启动容器、数据库迁移与健康检查
+
+不使用 self-hosted runner，因此仓库公开也不会把外部代码引入部署机器。完整的一次性配置（Cloudflare Service Token、GitHub Secrets、部署密钥）与故障排查见 [部署到 Mac Mini](docs/deploy-mac-mini.md)。
+
 ## ⚙️ 配置说明
 
 核心配置在 `.env`：
@@ -194,6 +203,8 @@ client/
 ├── vite.config.ts      开发和构建配置
 └── tsconfig*.json      TypeScript 配置
 
+.github/workflows/    CI（PR 校验）与 CD（合并 main 自动部署）
+docs/                 部署与运维文档
 docker-compose.yml   基础设施 + deploy profile
 Dockerfile           多阶段构建：前端构建 → 后端同源托管
 ```

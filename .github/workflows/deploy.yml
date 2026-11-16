@@ -1,0 +1,91 @@
+name: deploy
+
+# 合并到 main 后自动部署；workflow_dispatch 用于首次验证或手动重发
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一时间只允许一个部署，避免连续合并并发打架
+concurrency:
+  group: deploy-mac-mini
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SSH_HOST: ssh.x-pages.cc.cd
+  SSH_USER: lansen
+
+jobs:
+  deploy:
+    name: 部署到 Mac Mini
+    # 只在本人仓库运行，fork 出来的仓库即使改了 workflow 也跑不到你的机器
+    if: github.repository_owner == 'xiaodye'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 安装 cloudflared
+        run: |
+          curl -fsSL -o /tmp/cloudflared \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared
+          cloudflared --version
+
+      - name: 准备 SSH 凭证
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # 固定 Mac Mini 的 sshd 主机公钥（Ed25519），避免 ssh-keyscan 的中间人风险
+          echo "ssh.x-pages.cc.cd ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIADfrdQkQe/FYKVNWMg8zOGuqAIV2e/mBCAN+TCdm7bs" >> ~/.ssh/known_hosts
+
+      - name: 执行部署
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          ssh -o ProxyCommand="cloudflared access ssh --hostname %h" \
+              -o IdentitiesOnly=yes \
+              -o ConnectTimeout=30 \
+              -o ServerAliveInterval=15 \
+              "${SSH_USER}@${SSH_HOST}" 'bash -s' <<'EOS'
+          set -euo pipefail
+          export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+          cd ~/apps/ai-photo-workspace
+
+          echo "==> 拉取最新代码（保留 .env 等未跟踪文件）"
+          git fetch origin main --quiet
+          git reset --hard origin/main
+          echo "当前提交: $(git log -1 --oneline)"
+
+          echo "==> 构建并启动容器"
+          docker compose --profile deploy up -d --build
+
+          echo "==> 数据库迁移"
+          docker compose --profile deploy exec -T app alembic upgrade head
+
+          echo "==> 健康检查"
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS localhost:7302/api/health >/dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+          if [ "$ok" != "1" ]; then
+            echo "!! 健康检查失败，最近日志："
+            docker compose --profile deploy logs --tail=60 app || true
+            exit 1
+          fi
+
+          echo "==> SPA 深层路由验收"
+          code=$(curl -s -o /dev/null -w '%{http_code}' localhost:7302/editor/smoke)
+          if [ "$code" != "200" ]; then
+            echo "!! /editor/smoke 返回 $code，SPA fallback 未生效"
+            echo "   提示：需先合并 fix/spa-history-fallback 分支并重新部署"
+            exit 1
+          fi
+
+          echo "==> 部署完成"
+          curl -fsS localhost:7302/api/health; echo
+          EOS
