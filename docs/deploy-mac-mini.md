@@ -146,7 +146,8 @@ Include: Service Token → github-actions-deploy
   2. 下载并安装 `cloudflared`
   3. 写入 `SSH_PRIVATE_KEY`，用 `ssh-keygen -y` 先校验私钥可用，再把 Mac Mini 的 **sshd 主机公钥写死**进 `known_hosts`
   4. `rsync` 经隧道把代码增量同步到 Mac Mini
-  5. 经 `cloudflared access ssh` 连入 Mac Mini，执行构建/迁移/健康检查
+  5. **检查服务器本地配置**：`.env` / `docker-compose.override.yml` / `Dockerfile.local` 缺任何一个就立即失败，并提示准备命令
+  6. 经 `cloudflared access ssh` 连入 Mac Mini，执行构建/迁移/健康检查
 
 远程脚本（内嵌在 workflow 中）：
 
@@ -207,6 +208,7 @@ docker compose --profile deploy exec -T app alembic upgrade head
 | --- | --- | --- |
 | `cloudflared: command not found` | 安装步骤失败 | 看「安装 cloudflared」日志，通常是 GitHub 下载超时，可重跑 |
 | `websocket: bad handshake` | Access 拒绝了 Service Token | 应用策略的 Action 必须是「服务身份验证」，不能是「允许」 |
+| `服务器缺少本地配置文件` | 新机器还没准备 `.env` 等三件套 | 按提示的 `cp` 命令准备，见「前置条件」 |
 | `Load key ... error in libcrypto` | Secret 里的私钥被破坏（最常见是换行丢失） | 用 `gh secret set SSH_PRIVATE_KEY < ~/.ssh/deploy_macmini` 从文件直接写入，别用剪贴板 |
 | `Permission denied (publickey)` | Secret 里的私钥不完整，或公钥没加到 Mac Mini | 重新复制完整私钥；`ssh-keygen -lf ~/.ssh/authorized_keys` 核对指纹 |
 | `Host key verification failed` | Mac Mini 重装或换了主机密钥 | 更新 workflow 里写死的 Ed25519 公钥 |
