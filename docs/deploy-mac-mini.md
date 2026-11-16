@@ -55,22 +55,31 @@ PR ──push──▶ GitHub 托管 runner
 
 > 国内网络下构建必须用 `Dockerfile.local`：官方 `Dockerfile` 里的 `download.docker.com` 与 `deb.debian.org` 会超时或极慢。
 
-**这三个文件不存在时，部署会失败**（`docker compose` 会报 `env file .env not found`）。全新机器上按下面的顺序准备：
+**这三个文件不存在时，部署会失败**（`docker compose` 会报 `env file .env not found`）。全新机器上一条命令生成：
 
 ```bash
 cd ~/apps/ai-photo-workspace
-
-cp .env.example .env
-# 编辑 .env：至少填 JWT_SECRET、数据库密码、S3 凭据、模型相关 Key
-
-cp docker-compose.override.example.yml docker-compose.override.yml
-# 编辑：把 <你的域名> 换成实际访问对象存储用的域名
-
-cp Dockerfile Dockerfile.local
-# 编辑：apt / PyPI / npm 换成国内源（见「已知限制」）
+./scripts/bootstrap-mac-mini.sh          # 幂等：已存在的文件会跳过，--force 覆盖
 ```
 
-> `.gitignore` 已排除这三个本地文件，避免误提交密钥或机器相关配置。
+它会做四件事：
+
+| 产出 | 说明 |
+| --- | --- |
+| `.env` | 从 `.env.example` 复制，`JWT_SECRET` 换成 `secrets.token_hex(32)` 随机值，权限设 `600` |
+| `docker-compose.override.yml` | 从模板生成：端口只绑 `127.0.0.1`、使用 `Dockerfile.local` |
+| `Dockerfile.local` | 从 `Dockerfile` 生成并替换 3 处为国内源；**上游 Dockerfile 变动导致替换点找不到时会直接报错**，不会生成坏文件 |
+| 自检 | 结尾跑 `docker compose config --quiet` |
+
+然后手填 `.env` 里机器相关的值：
+
+| 变量 | 说明 |
+| --- | --- |
+| `S3_PUBLIC_ENDPOINT` | **对外访问对象存储的域名**。留空会回退 `http://localhost:7313`，外网图片打不开。`docker-compose.yml` 通过 `${S3_PUBLIC_ENDPOINT:-http://localhost:7313}` 插值读取，**换域名只改这一行，不用动 compose 或 override** |
+| `DASHSCOPE_API_KEY` | 接真实模型时必填；`IMAGE_PROVIDER=mock` 时可不填 |
+| `IMAGE_PROVIDER` | `mock`（本地占位图，无费用）或 `dashscope`（真实模型） |
+
+> `.gitignore` 已排除这三个本地文件，避免误提交密钥或机器相关配置。手动准备也可以，按上面表格里的来源逐个复制即可。
 
 ## 一次性配置
 
@@ -253,4 +262,5 @@ docker compose --profile deploy logs --tail=80 app
 | `.github/workflows/deploy.yml` | 合并 main 后部署 |
 | `Dockerfile` / `Dockerfile.local` | 通用构建 / 换国内源的构建 |
 | `docker-compose.override.example.yml` | 服务器本地配置模板（复制成 `docker-compose.override.yml` 再改） |
+| `scripts/bootstrap-mac-mini.sh` | 一条命令生成上面三个本地配置文件 |
 | `docker-compose.yml` / `docker-compose.override.yml` | 基础编排 / 生产覆盖 |

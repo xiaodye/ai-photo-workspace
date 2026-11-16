@@ -2,13 +2,16 @@
 #
 # 用法：
 #   cp docker-compose.override.example.yml docker-compose.override.yml
-#   然后把下面所有 <...> 占位符改成你的实际值
+#   或直接运行 scripts/bootstrap-mac-mini.sh 自动生成
 #
-# 这个文件本身是模板，可以入库；生成出来的 docker-compose.override.yml
-# 已被 .gitignore 排除，且 CI 部署时会被 rsync 排除，不会覆盖你改过的版本。
+# 这个文件本身可以入库；生成出来的 docker-compose.override.yml 已被
+# .gitignore 排除，且 CI 部署时会被 rsync 排除，不会覆盖你改过的版本。
 #
 # 注意：`!override` 是 Compose 2.24+ 的 YAML 标签，表示「替换」而不是「追加」列表。
 # 不用它的话，端口会变成「仓库里的 + 你写的」两份叠加。
+#
+# S3_PUBLIC_ENDPOINT 不在这里写死：它来自 .env，由 docker-compose.yml 里的
+# ${S3_PUBLIC_ENDPOINT:-http://localhost:7313} 读取。换域名只改 .env 即可。
 
 services:
   app:
@@ -17,10 +20,6 @@ services:
       # 国内网络构建建议用 Dockerfile.local（apt / PyPI / npm 换国内源）。
       # 海外服务器可以删掉这行，改用仓库自带的 Dockerfile。
       dockerfile: Dockerfile.local
-    environment:
-      # 浏览器访问对象存储用的地址，必须等于用户实际能打开的域名/地址。
-      # 填错的话签名 URL 会指向一个打不开的地址，图片全部加载失败。
-      S3_PUBLIC_ENDPOINT: https://s3.<你的域名>
     ports: !override
       # 只绑本机，由 Cloudflare Tunnel 或反向代理对外提供
       - "127.0.0.1:7302:7302"
@@ -29,8 +28,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.local
-    environment:
-      S3_PUBLIC_ENDPOINT: https://s3.<你的域名>
 
   # 数据库和缓存不对外暴露。
   # 只有本地调试时才临时放开端口，用完记得改回来（否则整个公网都能连）。
