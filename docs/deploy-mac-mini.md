@@ -32,7 +32,7 @@ PR ──push──▶ GitHub 托管 runner
                         │  隧道
                         ▼
                     Mac Mini: ~/apps/ai-photo-workspace
-                        ├─ rsync 增量同步代码（排除 .env 等本地配置）
+                        ├─ rsync 增量同步代码 + .git（排除 .env 等本地配置）
                         ├─ docker compose --profile deploy up -d --build
                         ├─ alembic upgrade head
                         ├─ /api/health 健康检查
@@ -146,7 +146,17 @@ docker compose --profile deploy exec -T app alembic upgrade head
 
 家庭宽带访问 GitHub 很不稳定：同一台机器上用 `curl` 有时 0.1 秒连通，`git fetch` 却可能 75 秒后报 `Operation timed out`；不同 DNS 还会解析到可用性不同的 IP。早期版本让 Mac Mini 执行 `git fetch origin main`，结果部署频繁失败在拉代码这一步。
 
-现在的做法是把「获取代码」交给 runner（Azure 机房，访问 GitHub 稳定），再用 `rsync` 走已有隧道增量同步。代价是 Mac Mini 上的目录内容以 CI 同步为准，`.git` 仅保留给人工排查，不再作为部署依据。
+现在的做法是把「获取代码」交给 runner（Azure 机房，访问 GitHub 稳定），再用 `rsync` 走已有隧道增量同步。
+
+**同步时把 `.git` 一起带上**（`actions/checkout` 用 `fetch-depth: 0` 取完整历史）。这样 Mac Mini 上仍然是一个**干净可用的 git 仓库**：
+
+- `git log` 能看到完整提交历史
+- `git status` 是干净的（部署后执行 `git update-index --refresh` 刷新 mtime 缓存）
+- 线上出问题时可以 `git reset --hard <旧 commit>` 后重新构建来回滚
+
+代价是每次部署多传约 3~4 MB 的 `.git`(git 的 pack 文件随历史变化整体重写,无法只传增量)。实测隧道上耗时约 2~4 秒,相对整个部署可以接受。
+
+> 顺带收益:Mac Mini 上原来是 `--depth 1` 的 shallow 仓库,同步完整历史后自动变成普通仓库。
 
 `rsync` 用 `--delete` 保证文件与仓库一致，同时排除三类本地配置，避免被覆盖或删除：
 
@@ -155,7 +165,6 @@ docker compose --profile deploy exec -T app alembic upgrade head
 | `.env` / `.env.local` | 生产环境变量，不入库 |
 | `docker-compose.override.yml` | 端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口 |
 | `Dockerfile.local` | 换国内源的构建文件 |
-| `.git/` | 保留人工排查能力 |
 
 ## 首次验证
 
@@ -213,7 +222,7 @@ docker compose --profile deploy logs --tail=80 app
 - **部署期间 5~15 秒不可用**：单机重建容器，没有蓝绿或负载均衡；要零停机需要两套端口 + 切换入口。
 - **失败不自动回滚**：健康检查失败会让 job 标红并打印日志，但线上停留在新版本，需要手动处理。
 - **构建耗时**：Mac Mini 上有层缓存时约 2~4 分钟，全量重建约 8~10 分钟。
-- **部署目录由 CI 同步**：`~/apps/ai-photo-workspace` 的文件内容以 `rsync` 结果为准，`.git` 仅供人工排查。手动 `git pull` 会导致与 CI 的同步状态不一致，日常不需要再手动拉取。
+- **部署目录由 CI 同步**：`~/apps/ai-photo-workspace` 的文件内容以 `rsync` 结果为准。目录里保留了完整的 `.git`，可以正常 `git log` / `git diff` / 按 commit 回滚，但**不要手动 `git pull` 或 `git push`** —— 下一次部署会用 rsync 覆盖工作区，以 CI 为准。
 - **Docker Desktop 的钥匙串限制**：非 GUI 会话里任何需要拉取镜像的步骤都可能报 `keychain cannot be accessed`。当前流程依赖本地已有基础镜像，不触发拉取；若以后要 `docker compose pull`，需给 workflow 指定不含 `credsStore` 的 `DOCKER_CONFIG`。
 
 ## 相关文件

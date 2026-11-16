@@ -30,6 +30,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 取完整历史，让 Mac Mini 上的 .git 同步后仍是可用的仓库
+          fetch-depth: 0
 
       - name: 安装 cloudflared
         run: |
@@ -56,8 +59,8 @@ jobs:
           # 走 rsync 而不是让 Mac Mini 自己 git pull：家庭宽带访问 GitHub 不稳定，
           # runner 侧拿到代码后再增量同步，避免把网络抖动变成部署失败。
           # 排除项保护 Mac Mini 上的本地配置不被覆盖或删除。
+          # 注意：.git 也要同步，这样服务器上仍然是干净的仓库（可 git log / 按 commit 回滚）。
           rsync -az --delete --stats \
-            --exclude '.git/' \
             --exclude '.DS_Store' \
             --exclude '.env' \
             --exclude '.env.local' \
@@ -83,6 +86,9 @@ jobs:
           set -euo pipefail
           export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
           cd ~/apps/ai-photo-workspace
+
+          # rsync 后刷新索引缓存，避免 mtime 差异让 git status 显示成脏工作区
+          git update-index --refresh >/dev/null 2>&1 || true
 
           echo "==> 部署版本: ${DEPLOY_SHA:0:8}"
 
