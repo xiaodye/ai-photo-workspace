@@ -74,6 +74,37 @@ jobs:
             -e "ssh -o ProxyCommand='cloudflared access ssh --hostname %h' -o IdentitiesOnly=yes -o ConnectTimeout=30 -o ServerAliveInterval=15" \
             ./ "${SSH_USER}@${SSH_HOST}:${APP_DIR}/"
 
+      - name: 检查服务器本地配置
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          # 这三个文件不会被 rsync 同步（在排除列表里），必须事先在服务器上准备好。
+          # 缺失时提前失败并给出明确指引，避免只看到 compose 的 "env file .env not found"。
+          ssh -o ProxyCommand="cloudflared access ssh --hostname %h" \
+              -o IdentitiesOnly=yes \
+              -o ConnectTimeout=30 \
+              "${SSH_USER}@${SSH_HOST}" 'bash -s' <<'EOS'
+          set -uo pipefail
+          cd ~/apps/ai-photo-workspace
+
+          missing=""
+          for f in .env docker-compose.override.yml Dockerfile.local; do
+            [ -f "$f" ] || missing="$missing $f"
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::error::服务器缺少本地配置文件:$missing"
+            echo "  请在 Mac Mini 上按 docs/deploy-mac-mini.md 的「前置条件」准备："
+            echo "    cp .env.example .env"
+            echo "    cp docker-compose.override.example.yml docker-compose.override.yml"
+            echo "    cp Dockerfile Dockerfile.local"
+            exit 1
+          fi
+
+          echo "本地配置齐全：.env / docker-compose.override.yml / Dockerfile.local"
+          EOS
+
       - name: 构建并重启
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
