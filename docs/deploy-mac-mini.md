@@ -6,17 +6,19 @@
 
 ## 为什么是这个方案
 
-Mac Mini 位于家庭宽带 NAT 之后，没有公网 IP，GitHub 的托管 runner 无法主动连进去。常见的三种解法对比：
+Mac Mini 位于家庭宽带 NAT 之后，没有公网 IP，GitHub 的托管 runner 无法主动连进去。在三种解法中选「SSH over Cloudflare Tunnel」：
 
-| 方案 | 需要暴露什么 | 密钥数量 | 公开仓库是否安全 | 复杂度 |
-| --- | --- | --- | --- | --- |
-| **SSH over Cloudflare Tunnel（本方案）** | 已有的 `ssh.<域名>` 隧道入口 | 3 | ✅ 安全 | 低 |
-| self-hosted runner | 无 | 0 | ❌ 有风险 | 高 |
-| 定时 git 轮询 | 无 | 0 | ✅ 安全 | 低，但有分钟级延迟 |
+| 方案 | 需要暴露什么 | 公开仓库是否安全 | 复杂度 |
+| --- | --- | --- | --- |
+| **SSH over Cloudflare Tunnel（本方案）** | 已有的 `ssh.<域名>` 隧道入口 | ✅ 安全 | 低 |
+| self-hosted runner | 无 | ❌ 有风险 | 高 |
+| 定时 git 轮询 | 无 | ✅ 安全 | 低，但有分钟级延迟 |
 
-选择第一种的原因：复用已有的 Cloudflare Tunnel 与 Access 能力，拥有 Actions 的完整日志与手动重跑能力，同时不给公开仓库引入自托管 runner 的风险。
+理由是复用已有的隧道与 Access 能力，同时保留 Actions 的完整日志与手动重跑能力，又不必给公开仓库引入自托管 runner。
 
 > GitHub 官方明确不建议把 self-hosted runner 挂到公开仓库：`pull_request` 事件会执行工作流所在分支的代码，攻击者 fork 后修改 workflow 即可在你的机器上执行任意命令。
+
+隧道本身怎么搭（安装、创建、绑 DNS、开机自启）属于 Mac mini 的基础设施配置，见 [把 Mac mini 变成常驻云服务器](./macmini-as-cloud-server.md#内网穿透-cloudflare-tunnel)，本文不重复。
 
 ## 架构
 
@@ -48,6 +50,9 @@ PR ──push──▶ GitHub 托管 runner
 - Docker Desktop（`docker` 在 `/usr/local/bin`）
 - `cloudflared` 以 LaunchDaemon 方式运行，隧道已绑定 `ssh.<域名>` → `ssh://localhost:22`
 - Cloudflare Access 应用保护该主机名（邮箱策略，人工登录用）
+
+> 以上三项属于通用的「让 Mac 常驻在线」配置，搭建方法见 [把 Mac mini 变成常驻云服务器](./macmini-as-cloud-server.md)。`cloudflared` 必须用 LaunchDaemon 而非 LaunchAgent，否则重启后无人登录时隧道不会启动。
+
 - 部署目录 `~/apps/ai-photo-workspace`，其中包含三个**本地配置文件**（`rsync` 时被排除，不会被覆盖或删除）：
   - `.env`：生产环境变量（从 `.env.example` 复制后填真实值）
   - `docker-compose.override.yml`：端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口（从 `docker-compose.override.example.yml` 复制后改占位符）
