@@ -253,7 +253,7 @@ export const useEditorUi = create<EditorUi>((set) => ({
       cropOpen: false,
       compareOpen: false,
       cropRect: selectMode ? null : state.cropRect,
-      panel: selectMode ? null : withoutReplace(state.panel),
+      panel: state.panel === 'layers' ? state.panel : selectMode ? null : withoutReplace(state.panel),
     })),
 
   /**
