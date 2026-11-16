@@ -17,6 +17,9 @@ permissions:
 env:
   SSH_HOST: ssh.x-pages.cc.cd
   SSH_USER: lansen
+  APP_DIR: apps/ai-photo-workspace
+  # Mac Mini 的 sshd 主机公钥（Ed25519），固定写死避免中间人攻击
+  SSH_HOST_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIADfrdQkQe/FYKVNWMg8zOGuqAIV2e/mBCAN+TCdm7bs
 
 jobs:
   deploy:
@@ -26,22 +29,48 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - uses: actions/checkout@v4
+
       - name: 安装 cloudflared
         run: |
           curl -fsSL -o /tmp/cloudflared \
             https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
           sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared
           cloudflared --version
+          rsync --version | head -1
 
       - name: 准备 SSH 凭证
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          # 固定 Mac Mini 的 sshd 主机公钥（Ed25519），避免 ssh-keyscan 的中间人风险
-          echo "ssh.x-pages.cc.cd ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIADfrdQkQe/FYKVNWMg8zOGuqAIV2e/mBCAN+TCdm7bs" >> ~/.ssh/known_hosts
+          # 先校验私钥本身可用，失败信息比 SSH 报错更直观
+          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
+          echo "${SSH_HOST} ${SSH_HOST_KEY}" >> ~/.ssh/known_hosts
 
-      - name: 执行部署
+      - name: 同步代码到 Mac Mini
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          # 走 rsync 而不是让 Mac Mini 自己 git pull：家庭宽带访问 GitHub 不稳定，
+          # runner 侧拿到代码后再增量同步，避免把网络抖动变成部署失败。
+          # 排除项保护 Mac Mini 上的本地配置不被覆盖或删除。
+          rsync -az --delete --stats \
+            --exclude '.git/' \
+            --exclude '.DS_Store' \
+            --exclude '.env' \
+            --exclude '.env.local' \
+            --exclude 'docker-compose.override.yml' \
+            --exclude 'Dockerfile.local' \
+            --exclude 'node_modules/' \
+            --exclude '.venv/' \
+            --exclude '__pycache__/' \
+            --exclude 'client/dist/' \
+            -e "ssh -o ProxyCommand='cloudflared access ssh --hostname %h' -o IdentitiesOnly=yes -o ConnectTimeout=30 -o ServerAliveInterval=15" \
+            ./ "${SSH_USER}@${SSH_HOST}:${APP_DIR}/"
+
+      - name: 构建并重启
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
@@ -50,15 +79,12 @@ jobs:
               -o IdentitiesOnly=yes \
               -o ConnectTimeout=30 \
               -o ServerAliveInterval=15 \
-              "${SSH_USER}@${SSH_HOST}" 'bash -s' <<'EOS'
+              "${SSH_USER}@${SSH_HOST}" "DEPLOY_SHA=${{ github.sha }} bash -s" <<'EOS'
           set -euo pipefail
           export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
           cd ~/apps/ai-photo-workspace
 
-          echo "==> 拉取最新代码（保留 .env 等未跟踪文件）"
-          git fetch origin main --quiet
-          git reset --hard origin/main
-          echo "当前提交: $(git log -1 --oneline)"
+          echo "==> 部署版本: ${DEPLOY_SHA:0:8}"
 
           echo "==> 构建并启动容器"
           docker compose --profile deploy up -d --build
@@ -82,7 +108,6 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' localhost:7302/editor/smoke)
           if [ "$code" != "200" ]; then
             echo "!! /editor/smoke 返回 $code，SPA fallback 未生效"
-            echo "   提示：需先合并 fix/spa-history-fallback 分支并重新部署"
             exit 1
           fi
 

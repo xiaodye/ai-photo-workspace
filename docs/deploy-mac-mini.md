@@ -32,7 +32,7 @@ PR ──push──▶ GitHub 托管 runner
                         │  隧道
                         ▼
                     Mac Mini: ~/apps/ai-photo-workspace
-                        ├─ git reset --hard origin/main（保留 .env 等未跟踪文件）
+                        ├─ rsync 增量同步代码（排除 .env 等本地配置）
                         ├─ docker compose --profile deploy up -d --build
                         ├─ alembic upgrade head
                         ├─ /api/health 健康检查
@@ -48,7 +48,7 @@ PR ──push──▶ GitHub 托管 runner
 - Docker Desktop（`docker` 在 `/usr/local/bin`）
 - `cloudflared` 以 LaunchDaemon 方式运行，隧道已绑定 `ssh.<域名>` → `ssh://localhost:22`
 - Cloudflare Access 应用保护该主机名（邮箱策略，人工登录用）
-- 部署目录 `~/apps/ai-photo-workspace`，其中包含三个**未跟踪**文件（`git reset --hard` 不会覆盖它们）：
+- 部署目录 `~/apps/ai-photo-workspace`，其中包含三个**本地配置文件**（`rsync` 时被排除，不会被覆盖或删除）：
   - `.env`：生产环境变量
   - `docker-compose.override.yml`：端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口
   - `Dockerfile.local`：apt / PyPI / npm 换国内源
@@ -125,24 +125,37 @@ Include: Service Token → github-actions-deploy
 - `concurrency` 串行化，避免连续合并并发部署
 - `if: github.repository_owner == 'xiaodye'`，fork 出来的仓库无法命中
 - 步骤：
-  1. 下载并安装 `cloudflared`
-  2. 写入 `SSH_PRIVATE_KEY`，并把 Mac Mini 的 **sshd 主机公钥写死**进 `known_hosts`
-  3. 经 `cloudflared access ssh` 连入 Mac Mini，执行远程脚本
+  1. `actions/checkout` 取到本次提交的代码
+  2. 下载并安装 `cloudflared`
+  3. 写入 `SSH_PRIVATE_KEY`，用 `ssh-keygen -y` 先校验私钥可用，再把 Mac Mini 的 **sshd 主机公钥写死**进 `known_hosts`
+  4. `rsync` 经隧道把代码增量同步到 Mac Mini
+  5. 经 `cloudflared access ssh` 连入 Mac Mini，执行构建/迁移/健康检查
 
 远程脚本（内嵌在 workflow 中）：
 
 ```bash
 set -euo pipefail
 cd ~/apps/ai-photo-workspace
-git fetch origin main --quiet
-git reset --hard origin/main          # 未跟踪的 .env / override / Dockerfile.local 保留
 docker compose --profile deploy up -d --build
 docker compose --profile deploy exec -T app alembic upgrade head
 # 健康检查（最多 60s）
 # SPA 深层路由验收：GET /editor/smoke 必须是 200
 ```
 
-选择 `git reset --hard` 而不是 `actions/checkout` + `rsync`，是为了不覆盖 Mac Mini 上的环境文件。
+### 为什么由 CI 推送代码，而不是让 Mac Mini 自己 `git pull`
+
+家庭宽带访问 GitHub 很不稳定：同一台机器上用 `curl` 有时 0.1 秒连通，`git fetch` 却可能 75 秒后报 `Operation timed out`；不同 DNS 还会解析到可用性不同的 IP。早期版本让 Mac Mini 执行 `git fetch origin main`，结果部署频繁失败在拉代码这一步。
+
+现在的做法是把「获取代码」交给 runner（Azure 机房，访问 GitHub 稳定），再用 `rsync` 走已有隧道增量同步。代价是 Mac Mini 上的目录内容以 CI 同步为准，`.git` 仅保留给人工排查，不再作为部署依据。
+
+`rsync` 用 `--delete` 保证文件与仓库一致，同时排除三类本地配置，避免被覆盖或删除：
+
+| 排除项 | 原因 |
+| --- | --- |
+| `.env` / `.env.local` | 生产环境变量，不入库 |
+| `docker-compose.override.yml` | 端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口 |
+| `Dockerfile.local` | 换国内源的构建文件 |
+| `.git/` | 保留人工排查能力 |
 
 ## 首次验证
 
@@ -166,6 +179,8 @@ docker compose --profile deploy exec -T app alembic upgrade head
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
 | `cloudflared: command not found` | 安装步骤失败 | 看「安装 cloudflared」日志，通常是 GitHub 下载超时，可重跑 |
+| `websocket: bad handshake` | Access 拒绝了 Service Token | 应用策略的 Action 必须是「服务身份验证」，不能是「允许」 |
+| `Load key ... error in libcrypto` | Secret 里的私钥被破坏（最常见是换行丢失） | 用 `gh secret set SSH_PRIVATE_KEY < ~/.ssh/deploy_macmini` 从文件直接写入，别用剪贴板 |
 | `Permission denied (publickey)` | Secret 里的私钥不完整，或公钥没加到 Mac Mini | 重新复制完整私钥；`ssh-keygen -lf ~/.ssh/authorized_keys` 核对指纹 |
 | `Host key verification failed` | Mac Mini 重装或换了主机密钥 | 更新 workflow 里写死的 Ed25519 公钥 |
 | `403` / 登录页卡住 | Service Token 未加入 Access 策略，或 Action 选成了 `Allow` | 改为 `Service Auth` 策略 |
@@ -191,13 +206,14 @@ docker compose --profile deploy logs --tail=80 app
 | 主机身份校验 | 写死 sshd 的 Ed25519 公钥，不用 `ssh-keyscan` |
 | 仓库权限 | workflow 声明 `permissions: contents: read` |
 | 密钥轮换 | Service Token 设有效期；私钥泄露时从 Mac Mini 的 `authorized_keys` 删除对应公钥即可 |
-| 敏感文件 | `.env` 不入库；部署目录中的未跟踪文件不被 `git reset` 清理 |
+| 敏感文件 | `.env` 不入库；部署目录中的本地配置被 `rsync` 排除，不会被覆盖或删除 |
 
 ## 已知限制
 
 - **部署期间 5~15 秒不可用**：单机重建容器，没有蓝绿或负载均衡；要零停机需要两套端口 + 切换入口。
 - **失败不自动回滚**：健康检查失败会让 job 标红并打印日志，但线上停留在新版本，需要手动处理。
 - **构建耗时**：Mac Mini 上有层缓存时约 2~4 分钟，全量重建约 8~10 分钟。
+- **部署目录由 CI 同步**：`~/apps/ai-photo-workspace` 的文件内容以 `rsync` 结果为准，`.git` 仅供人工排查。手动 `git pull` 会导致与 CI 的同步状态不一致，日常不需要再手动拉取。
 - **Docker Desktop 的钥匙串限制**：非 GUI 会话里任何需要拉取镜像的步骤都可能报 `keychain cannot be accessed`。当前流程依赖本地已有基础镜像，不触发拉取；若以后要 `docker compose pull`，需给 workflow 指定不含 `credsStore` 的 `DOCKER_CONFIG`。
 
 ## 相关文件
