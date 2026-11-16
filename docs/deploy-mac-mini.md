@@ -49,11 +49,28 @@ PR ──push──▶ GitHub 托管 runner
 - `cloudflared` 以 LaunchDaemon 方式运行，隧道已绑定 `ssh.<域名>` → `ssh://localhost:22`
 - Cloudflare Access 应用保护该主机名（邮箱策略，人工登录用）
 - 部署目录 `~/apps/ai-photo-workspace`，其中包含三个**本地配置文件**（`rsync` 时被排除，不会被覆盖或删除）：
-  - `.env`：生产环境变量
-  - `docker-compose.override.yml`：端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口
+  - `.env`：生产环境变量（从 `.env.example` 复制后填真实值）
+  - `docker-compose.override.yml`：端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口（从 `docker-compose.override.example.yml` 复制后改占位符）
   - `Dockerfile.local`：apt / PyPI / npm 换国内源
 
 > 国内网络下构建必须用 `Dockerfile.local`：官方 `Dockerfile` 里的 `download.docker.com` 与 `deb.debian.org` 会超时或极慢。
+
+**这三个文件不存在时，部署会失败**（`docker compose` 会报 `env file .env not found`）。全新机器上按下面的顺序准备：
+
+```bash
+cd ~/apps/ai-photo-workspace
+
+cp .env.example .env
+# 编辑 .env：至少填 JWT_SECRET、数据库密码、S3 凭据、模型相关 Key
+
+cp docker-compose.override.example.yml docker-compose.override.yml
+# 编辑：把 <你的域名> 换成实际访问对象存储用的域名
+
+cp Dockerfile Dockerfile.local
+# 编辑：apt / PyPI / npm 换成国内源（见「已知限制」）
+```
+
+> `.gitignore` 已排除这三个本地文件，避免误提交密钥或机器相关配置。
 
 ## 一次性配置
 
@@ -233,4 +250,5 @@ docker compose --profile deploy logs --tail=80 app
 | `.github/workflows/ci.yml` | PR 校验 |
 | `.github/workflows/deploy.yml` | 合并 main 后部署 |
 | `Dockerfile` / `Dockerfile.local` | 通用构建 / 换国内源的构建 |
+| `docker-compose.override.example.yml` | 服务器本地配置模板（复制成 `docker-compose.override.yml` 再改） |
 | `docker-compose.yml` / `docker-compose.override.yml` | 基础编排 / 生产覆盖 |
