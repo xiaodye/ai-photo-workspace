@@ -3,6 +3,9 @@
 .env.local
 *.pem
 *.key
+docker-compose.override.yml
+Dockerfile.local
+.metadata_never_index
 
 # 方案与过程文档，不入库
 # docs/
