@@ -165,6 +165,7 @@ docker compose --profile deploy exec -T app alembic upgrade head
 | `.env` / `.env.local` | 生产环境变量，不入库 |
 | `docker-compose.override.yml` | 端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口 |
 | `Dockerfile.local` | 换国内源的构建文件 |
+| `.metadata_never_index` | 告诉 Spotlight 不要索引部署目录，避免每次部署后重新扫描 |
 
 ## 首次验证
 

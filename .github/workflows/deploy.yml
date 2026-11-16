@@ -62,6 +62,7 @@ jobs:
           # 注意：.git 也要同步，这样服务器上仍然是干净的仓库（可 git log / 按 commit 回滚）。
           rsync -az --delete --stats \
             --exclude '.DS_Store' \
+            --exclude '.metadata_never_index' \
             --exclude '.env' \
             --exclude '.env.local' \
             --exclude 'docker-compose.override.yml' \
