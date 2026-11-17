@@ -555,4 +555,5 @@ sudo lsof -iTCP -sTCP:LISTEN -P -n | grep -v 127.0.0.1
 | 文档 | 内容 |
 | --- | --- |
 | [deploy-mac-mini.md](./deploy-mac-mini.md) | 本仓库如何在 Mac 上部署（CI + Tunnel 的流水线） |
+| [latency-diagnostics.md](./latency-diagnostics.md) | 隧道链路慢时的测量方法与判读标准 |
 | [AGENTS.md](../AGENTS.md) | 项目协作与验证约定 |
