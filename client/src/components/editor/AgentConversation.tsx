@@ -40,7 +40,7 @@ export default function AgentConversation({ sessionId }: { sessionId: string }) 
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-3">
+    <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto px-3 py-3">
       {turns.map((turn) => (
         <TurnBlock key={turn.id} turn={turn} sessionId={sessionId} />
       ))}
@@ -51,13 +51,13 @@ export default function AgentConversation({ sessionId }: { sessionId: string }) 
 
 function TurnBlock({ turn, sessionId }: { turn: Turn; sessionId: string }) {
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2 [overflow-wrap:anywhere]">
       <p className="bg-brand-soft text-brand-strong ml-6 rounded-[12px] px-3 py-2 text-xs leading-relaxed">
         {turn.goal}
       </p>
 
       {turn.error ? (
-        <p className="text-danger mr-6 text-xs leading-relaxed">{turn.error}</p>
+        <p className="text-danger mr-6 whitespace-pre-wrap text-xs leading-relaxed">{turn.error}</p>
       ) : (
         <p className="text-ink mr-6 text-xs leading-relaxed">{turn.reply}</p>
       )}
@@ -147,9 +147,9 @@ function StepCard({
   }, [status, sessionId, queryClient])
 
   return (
-    <div className="border-line mr-6 rounded-[12px] border px-3 py-2">
+    <div className="border-line mr-6 min-w-0 rounded-[12px] border px-3 py-2">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-ink text-xs font-medium">
+        <span className="text-ink min-w-0 text-xs font-medium">
           {index}. {step.label}
         </span>
         <span className="text-faint shrink-0 text-[10px] tabular-nums">
@@ -164,7 +164,9 @@ function StepCard({
         </>
       )}
 
-      {error && <p className="text-danger mt-1.5 text-[10px] leading-relaxed">{error}</p>}
+      {error && (
+        <p className="text-danger mt-1.5 whitespace-pre-wrap text-[10px] leading-relaxed">{error}</p>
+      )}
     </div>
   )
 }
