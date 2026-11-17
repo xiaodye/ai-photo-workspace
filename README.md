@@ -2,9 +2,7 @@
 
 # AI 修图工作台
 
-**一句话驱动的 AI 修图工作台：Agent 自动规划修图步骤，调度 20+ 编辑工具完成专业级修图。**
-
-自然语言修图 · SAM 区域选择 · 图层拆分 · AI 文生图 · 局部编辑
+基于 FastAPI + LangGraph 与 React 19 + Konva 的全栈修图应用。用户输入一句自然语言，Agent 自动分析需求、规划修图步骤，然后逐步调用编辑工具执行——抠图、调色、区域编辑、图层拆分全部自动完成。前端提供支持缩放平移、图层文档、撤销重做的专业画布编辑器，所有长任务通过 ARQ 队列异步执行，Redis Pub/Sub + SSE 实时推送进度。
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev)
@@ -30,80 +28,75 @@
 
 ---
 
-基于 FastAPI + LangGraph 与 React 19 + Konva 的全栈修图应用。用户输入一句自然语言，Agent 自动分析需求、规划修图步骤，然后逐步调用编辑工具执行——抠图、调色、区域编辑、图层拆分全部自动完成。前端提供支持缩放平移、图层文档、撤销重做的专业画布编辑器，所有长任务通过 ARQ 队列异步执行，Redis Pub/Sub + SSE 实时推送进度。
+从上传图片或 AI 生图开始，在同一工作台中完成背景处理、局部修改、图层编辑与导出。既可以直接使用工具，也可以让 Agent 根据自然语言生成执行计划，确认后逐步处理，并查看任务进度与编辑记录。
 
-## ✨ 特性
+## ✨ 核心功能
 
-| 能力            | 说明                                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------------------- |
-| 🤖 自然语言修图 | 「把背景换成海滩」，Agent 规划步骤后逐步调用工具，UI 与 Agent 共用同一套工具注册表                             |
-| 🗺️ 多步计划     | 复杂需求生成结构化 JSON 计划，服务端校验参数、补全依赖、环检测，按拓扑排序执行，支持确认 / 单步重试 / 取消后续 |
-| 🎨 画布编辑器   | react-konva 实现：缩放平移、图层文档、撤销重做、前后对比滑杆                                                   |
-| 🎯 智能选区     | SAM 点选 + 笔刷涂抹，首次点击缓存 embedding，后续点选毫秒级响应；支持局部消除与局部替换（AI Inpainting）       |
-| 🧩 图层拆分     | 一键拆分主体 / 背景 / OCR 文字层，各层独立缩放、调色、移动，JSONB 持久化                                       |
-| 🖼️ AI 文生图    | 提示词生成四宫格候选图，SSE 实时进度，选中即进编辑器                                                           |
-| 📦 批量处理     | ARQ 异步队列 + 批量像素处理，进度推送、打包下载                                                                |
+| 功能                  | 说明                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| 🤖 自然语言修图       | 描述修改需求，由 Agent 规划并调用修图工具；支持查看计划、确认执行、重试失败步骤与取消后续操作。 |
+| 🎨 交互式画布         | 支持画布缩放和平移，以及图层移动、缩放、旋转、翻转、裁剪等手动编辑操作。                        |
+| 🪄 背景处理           | 支持去除背景、替换背景，以及将主体与背景拆成独立图层。                                          |
+| 🎯 选区与局部编辑     | 通过 SAM 点选或手动圈选指定区域，进行局部消除、内容替换，或将选区提取为独立图层。               |
+| 🧩 图层与文字编辑     | 管理图层顺序、可见性与透明度，调整图像颜色；支持 OCR 文字拆分与文字内容编辑。                   |
+| 🖼️ AI 图像生成与增强  | 支持提示词生图、扩图与超分辨率，将生成结果继续用于编辑。                                        |
+| 📦 营销与批量输出     | 支持营销图生成、多尺寸交付、批量处理及打包下载。                                                |
+| 🕘 编辑记录与效果对比 | 支持撤销、重做、历史记录查看与前后效果对比，保存会话中的素材和编辑状态。                        |
 
 ## 🖼️ 功能预览
 
 ### 自然语言修图
 
-在对话框输入一句话，Agent 自动规划步骤并调用工具执行，无需找按钮、调参数：
+在对话框描述需求，查看 Agent 生成的计划，确认后执行修图任务：
 
-![自然语言修图](https://pic.yupi.icu/pine/image-20260831155606100.png)
+![自然语言修图](./client/public/image-1.png)
+![自然语言修图](./client/public/image-2.png)
 
-### 专业画布编辑器
+### 交互式画布编辑器
 
 画布缩放平移、图层文档管理、撤销重做，前后对比滑杆一拖即见修图效果：
 
-![画布编辑器](https://pic.yupi.icu/pine/image-20260831153713493.png)
+![画布编辑器](./client/public/image-3.png)
 
 ### 智能区域选择与局部编辑
 
-SAM 点选精准选中任意物体，配合局部消除（Inpainting 抹除并补全背景）与局部替换（只改选区内容）：
+通过 SAM 点选或手动圈选确定区域，再执行局部消除或内容替换；编辑结果通过遮罩合成到原图：
 
-![智能选区](https://pic.yupi.icu/pine/Google%20Chrome%202026-08-31%2016.09.05.png)
+![智能选区](./client/public/image-4.png)
 
 ### 图层拆分
 
-一键按语义拆出主体 / 背景 / OCR 文字层，各图层独立编辑互不影响，切换图片后图层结构不丢：
+将图片拆分为主体、背景及可选的 OCR 文字层，在图层面板中分别编辑。文字样式还原的限制见下文“能力边界”：
 
-![图层拆分](https://pic.yupi.icu/pine/image-20260831161340074.png)
+![图层拆分](./client/public/image-5.png)
 
 ### 多步计划与人机协作
 
-复杂需求输出带依赖关系的结构化计划，用户确认执行、单步重试或取消后续，AI 干活你把关：
+复杂需求生成带依赖关系的执行计划，支持确认执行、重试失败步骤或取消后续操作：
 
-![多步计划](https://pic.yupi.icu/pine/image-20260831161657975.png)
+![多步计划](./client/public/image-6.png)
 
-## 🏗️ 架构总览
+## 🏗️ 技术栈与架构
 
-```mermaid
-flowchart LR
-    U([用户一句话]) --> FE[React 编辑器<br/>Konva 画布]
-    FE -- SSE --> API[FastAPI]
-    API --> AG[LangGraph Agent<br/>规划 · 校验 · 拓扑排序]
-    AG --> TL[统一工具注册表<br/>20+ 编辑工具]
-    API --> Q[ARQ 队列] --> W[Worker]
-    TL --> CV[CV 管线<br/>rembg / SAM / OCR]
-    TL --> MD[模型 Provider<br/>DashScope / Mock]
-    W --- DB[(PostgreSQL)] & RD[(Redis)] & S3[(MinIO)]
-```
-
-几个关键设计：
-
-- **统一工具注册表**：所有编辑工具一处定义，UI 工具栏与 Agent 共用，保证人手操作和 AI 调用行为一致
-- **Provider 抽象层**：生图 / 编辑 / 规划模型通过配置切换，`mock` 本地占位零费用调试，`dashscope` 一键接真实模型
-- **计划服务端校验**：Agent 输出的计划经过工具存在性、参数合法性、依赖补全与环检测，再按拓扑排序执行
-- **实时进度**：长任务走 ARQ 队列，Redis Pub/Sub 广播事件，SSE 推送到前端做进度插值
+![技术栈](./client/public/ai-photo-workspace-stack.svg)
 
 ## 🚀 快速开始
+
+### 环境要求
+
+- Python 3.13 或更高版本、uv。
+- Node.js 22（与 Docker 构建环境一致）、pnpm 11.23.0（与 CI / Docker 保持一致）。
+- Docker 与 Docker Compose，用于启动 PostgreSQL、Redis 和对象存储。
+
+以下各终端均从项目根目录开始执行。无需手动激活 `.venv`，使用 `uv run` 即可。
 
 ### 1. 配置
 
 ```bash
 cp .env.example .env
 ```
+
+已有 `.env` 时请直接检查配置，不要覆盖。默认图片服务为 Mock，可先验证页面与任务流程；真实 AI 图片处理及自然语言规划的配置见下文。
 
 ### 2. 启动基础设施
 
@@ -115,27 +108,74 @@ docker compose up -d postgres redis minio
 
 ```bash
 cd backend
-uv sync --all-extras                 # 安装依赖（含 cv / agent 可选组）
-uv run alembic upgrade head          # 初始化数据库
-uv run python -m app                 # API :7302
-uv run arq app.worker.WorkerSettings # 另开终端启动 Worker
+uv sync --all-extras --locked
+uv run alembic upgrade head
+uv run python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 7302
 ```
+
+另开一个终端，从项目根目录进入 `backend/` 启动 Worker：
+
+```bash
+cd backend
+uv run python -m arq app.worker.WorkerSettings
+```
+
+`--reload` 仅自动重启 API；修改 Worker 代码或根目录 `.env` 配置后，请手动重启对应服务。生产环境不要使用 `--reload`。
 
 ### 4. 启动前端
 
 ```bash
 cd client
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-### 一键部署
+打开开发服务器输出的地址（默认 `http://127.0.0.1:7301`），首次使用先注册账号，再上传图片或生成图片。API 默认监听 `http://127.0.0.1:7302`，接口文档位于 `/api/docs`。
+
+## ⚙️ 配置与能力边界
+
+核心配置在根目录 `.env`：
+
+| 变量                                                         | 说明                                                                                                               |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `IMAGE_PROVIDER`                                             | `mock` 返回本地占位图片；`dashscope` 调用真实图片模型，需要配置 `DASHSCOPE_API_KEY`。                              |
+| `DASHSCOPE_API_KEY` / `DASHSCOPE_BASE_URL`                   | 图片模型与对话规划使用的密钥及服务地址，按实际业务空间配置。                                                       |
+| `TEXT_TO_IMAGE_MODEL` / `IMAGE_EDIT_MODEL` / `PLANNER_MODEL` | 分别指定生图、图片编辑与对话规划模型。                                                                             |
+| `MATTING_PROVIDER`                                           | `auto` 优先使用 rembg，失败时降级；`rembg` 强制使用模型并在失败时报错；`corner` 使用简化处理，不代表真实模型效果。 |
+| `OCR_PROVIDER`                                               | `auto` 尝试使用 RapidOCR 识别文字，不可用时跳过；`none` 不拆分文字层。                                             |
+| `DATABASE_URL` / `REDIS_URL` / `S3_*`                        | 数据库、任务队列与对象存储连接配置；`S3_PUBLIC_ENDPOINT` 用于浏览器访问签名图片 URL。                              |
+| `JWT_SECRET` / `JWT_TTL_HOURS`                               | 登录态签名密钥与有效期；生产环境必须更换默认密钥。                                                                 |
+
+### Mock 与真实模型
+
+- **图片 Mock**：`IMAGE_PROVIDER=mock` 不调用收费图片模型，适合验证交互和任务流程，但不提供真实修图效果。
+- **自然语言规划**：即使图片使用 Mock，对话规划仍需要 `DASHSCOPE_API_KEY` 和可用的 `PLANNER_MODEL`，可能产生模型调用费用。
+- **真实图片处理**：将 `IMAGE_PROVIDER` 改为 `dashscope` 并配置可用的图片模型。图片会发送到对应模型服务，请注意素材隐私及服务方计费规则。
+- **本地视觉模型**：rembg、SAM 等能力首次使用时可能下载模型权重，耗时受网络、硬件及图片尺寸影响；图片 Mock 不会同时禁用本地视觉模型。
+- **轻量流程调试**：不需要本地视觉模型时，可使用 `MATTING_PROVIDER=corner`、`OCR_PROVIDER=none`；此时抠图与点选为简化结果，不能用于评估模型质量。
+
+### 能力边界
+
+- **点选分割**：SAM 缓存图像特征以减少重复计算，但不保证固定响应时间或对任意物体都能准确分割；自动模式下模型失败可能返回简化选区。
+- **局部编辑**：当前将图片交给编辑模型，再按选区遮罩合成结果，并非向模型直接传入遮罩的原生 Inpainting 接口。
+- **OCR 文字层**：主要还原文字内容与位置，不能完整复刻原图字体、颜色与排版效果，可能需要手动调整。
+- **图层拆分**：由分割、背景补全与可选 OCR 共同完成，不等同于恢复原始设计文件，结果取决于输入图片和模型效果。
+- **编辑历史**：按会话维护编辑记录，不是为图片墙中的每个素材分别建立独立历史；图层移动、旋转等操作保存的是文档状态，不会每次都生成一张新图片。
+
+## 🐳 Docker 部署与 CI/CD
+
+### Docker 部署
+
+在根目录准备好 `.env` 后执行：
 
 ```bash
-docker compose --profile deploy up -d
+docker compose --profile deploy up -d --build
+docker compose --profile deploy exec app alembic upgrade head
 ```
 
-多阶段构建，前端产物由后端同源托管，访问 `http://localhost:7302` 即可。
+镜像采用多阶段构建，前端产物由后端同源托管，访问 `http://localhost:7302` 即可。首次部署及包含数据库结构变更的更新均需执行迁移。
+
+公网部署前请更换开发用密钥与数据库、对象存储凭据，配置 HTTPS，并将 `S3_PUBLIC_ENDPOINT` 设为浏览器可访问的对象存储地址；不要直接将开发配置中的基础设施端口暴露到公网。
 
 ### 持续部署（CI/CD）
 
@@ -144,20 +184,7 @@ docker compose --profile deploy up -d
 - `.github/workflows/ci.yml`：PR 上跑后端 ruff 检查与前端 lint / build
 - `.github/workflows/deploy.yml`：`main` 触发构建、启动容器、数据库迁移与健康检查
 
-不使用 self-hosted runner，因此仓库公开也不会把外部代码引入部署机器。完整的一次性配置（Cloudflare Service Token、GitHub Secrets、部署密钥）与故障排查见 [部署到 Mac Mini](docs/deploy-mac-mini.md)。
-
-## ⚙️ 配置说明
-
-核心配置在 `.env`：
-
-| 变量                                                         | 说明                                                                                |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `IMAGE_PROVIDER`                                             | `mock` 使用本地占位图（零费用）；`dashscope` 接入真实模型，需填 `DASHSCOPE_API_KEY` |
-| `TEXT_TO_IMAGE_MODEL` / `IMAGE_EDIT_MODEL` / `PLANNER_MODEL` | 生图、编辑、规划模型名，按业务空间调整                                              |
-| `MATTING_PROVIDER`                                           | 抠图服务：`auto` 优先 rembg，`corner` 仅四角抠图                                    |
-| `OCR_PROVIDER`                                               | `auto` 检测到 RapidOCR 时拆出文字层，`none` 跳过                                    |
-| `DATABASE_URL` / `REDIS_URL` / `S3_*`                        | PostgreSQL、Redis、MinIO 连接配置                                                   |
-| `JWT_SECRET` / `JWT_TTL_HOURS`                               | 登录态签名密钥与有效期，生产环境必须替换随机值                                      |
+流水线使用 GitHub 托管 runner，而不是在部署机器上运行 self-hosted runner；合并进 `main` 的代码仍会进入部署流程，需要做好分支保护、代码审核和 Secrets 权限管理。此部署流程依赖仓库维护者的基础设施配置，克隆仓库后不会自动获得部署环境。完整的一次性配置与故障排查见 [部署到 Mac Mini](docs/deploy-mac-mini.md)。
 
 ## 🗂️ 项目结构
 
@@ -211,4 +238,4 @@ Dockerfile           多阶段构建：前端构建 → 后端同源托管
 
 ## 许可证
 
-[MIT](LICENSE)
+当前仓库尚未包含 `LICENSE` 文件，原 README 中的 MIT 声明缺少对应的许可证文本。使用、修改或分发前，请核实上游项目的许可证与版权归属，并补齐适用的许可证及第三方声明。

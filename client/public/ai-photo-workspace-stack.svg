@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="1152" viewBox="0 0 2048 1152" fill="none">
+  <title>AI 修图工作台 · 技术栈全景图</title>
+  <desc>白底淡绿色设计，展示后端开发、前端和画布、智能体与模型、图像处理、异步和通信、数据和部署六个技术分类。</desc>
+  <defs>
+    <style>
+      text { font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif; }
+      .title { font-size: 58px; font-weight: 700; fill: #183c32; letter-spacing: 1px; }
+      .subtitle { font-size: 23px; fill: #64786c; letter-spacing: 2px; }
+      .heading { font-size: 35px; font-weight: 650; fill: #24483c; }
+      .number { font-size: 25px; font-weight: 650; fill: #44846b; }
+      .row { font-size: 31px; font-weight: 500; fill: #273d31; }
+      .card { fill: #ffffff; stroke: #dce7df; stroke-width: 1.5; }
+      .divider { stroke: #e8eeea; stroke-width: 1.5; }
+      .icon { stroke: #50856c; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+    <g id="dot"><circle r="3" fill="#8eaf9a"/></g>
+    <g id="server" class="icon"><rect x="-13" y="-13" width="26" height="11" rx="3"/><rect x="-13" y="3" width="26" height="11" rx="3"/><path d="M-7-7h1m-1 16h1M1-7h6M1 9h6"/></g>
+    <g id="canvas" class="icon"><rect x="-14" y="-12" width="28" height="24" rx="4"/><path d="m-13 7 8-8 6 5 5-4 8 7"/><circle cx="5" cy="-5" r="2"/></g>
+    <g id="agent" class="icon"><circle cx="-10" cy="-10" r="4"/><circle cx="10" cy="0" r="4"/><circle cx="-10" cy="11" r="4"/><path d="m-6-8 12 6M-6 9 6 2M-10-6v13"/></g>
+    <g id="image" class="icon"><path d="m0-15 4 10 11 5-11 4-4 11-4-11-11-4 11-5Z"/></g>
+    <g id="async" class="icon"><circle r="14"/><path d="M0-8v9l6 4M-14-9v-6m0 6h6"/></g>
+    <g id="database" class="icon"><ellipse cy="-10" rx="13" ry="5"/><path d="M-13-10v20c0 7 26 7 26 0v-20M-13 0c0 7 26 7 26 0"/></g>
+  </defs>
+
+  <rect width="2048" height="1152" fill="#f7faf7"/>
+  <rect x="60" y="65" width="6" height="65" rx="3" fill="#75a88a"/>
+  <text x="90" y="112" class="title">AI 修图工作台</text>
+  <text x="90" y="153" class="subtitle">技术栈全景图 / TECHNOLOGY STACK</text>
+  <path d="M60 188H1988" stroke="#dce7df" stroke-width="1.5"/>
+
+  <g transform="translate(60 224)">
+    <rect width="624" height="398" rx="20" class="card"/>
+    <rect x="24" y="24" width="48" height="48" rx="14" fill="#edf5ef"/>
+    <use href="#server" x="48" y="48"/>
+    <text x="88" y="58" class="heading">后端开发</text><text x="565" y="57" class="number">01</text>
+    <path d="M24 92H600" class="divider"/>
+    <g class="row">
+      <use href="#dot" x="36" y="131"/><text x="56" y="140">Python 3.13</text>
+      <use href="#dot" x="36" y="177"/><text x="56" y="186">FastAPI + Pydantic v2</text>
+      <use href="#dot" x="36" y="223"/><text x="56" y="232">SQLAlchemy 2 + Alembic</text>
+      <use href="#dot" x="36" y="269"/><text x="56" y="278">asyncpg + Uvicorn</text>
+      <use href="#dot" x="36" y="315"/><text x="56" y="324">bcrypt + JWT Cookie</text>
+    </g>
+  </g>
+
+  <g transform="translate(716 224)">
+    <rect width="624" height="398" rx="20" class="card"/>
+    <rect x="24" y="24" width="48" height="48" rx="14" fill="#edf5ef"/>
+    <use href="#canvas" x="48" y="48"/>
+    <text x="88" y="58" class="heading">前端和画布</text><text x="565" y="57" class="number">02</text>
+    <path d="M24 92H600" class="divider"/>
+    <g class="row">
+      <use href="#dot" x="36" y="131"/><text x="56" y="140">TypeScript + React 19 + Vite</text>
+      <use href="#dot" x="36" y="177"/><text x="56" y="186">HeroUI + Tailwind CSS V4</text>
+      <use href="#dot" x="36" y="223"/><text x="56" y="232">react-konva 画布引擎</text>
+      <use href="#dot" x="36" y="269"/><text x="56" y="278">Zustand 视口状态</text>
+      <use href="#dot" x="36" y="315"/><text x="56" y="324">TanStack Query 数据管理</text>
+    </g>
+  </g>
+
+  <g transform="translate(1372 224)">
+    <rect width="624" height="398" rx="20" class="card"/>
+    <rect x="24" y="24" width="48" height="48" rx="14" fill="#edf5ef"/>
+    <use href="#agent" x="48" y="48"/>
+    <text x="88" y="58" class="heading">智能体与模型</text><text x="565" y="57" class="number">03</text>
+    <path d="M24 92H600" class="divider"/>
+    <g class="row">
+      <use href="#dot" x="36" y="131"/><text x="56" y="140">LangGraph 状态图</text>
+      <use href="#dot" x="36" y="177"/><text x="56" y="186">LangChain Core + ChatOpenAI</text>
+      <use href="#dot" x="36" y="223"/><text x="56" y="232">qwen-plus 负责编排规划</text>
+      <use href="#dot" x="36" y="269"/><text x="56" y="278">百炼 DashScope 图像模型</text>
+      <use href="#dot" x="36" y="315"/><text x="56" y="324">Provider 模型服务抽象层</text>
+      <use href="#dot" x="36" y="361"/><text x="56" y="370">ToolSpec 工具统一注册</text>
+    </g>
+  </g>
+
+  <g transform="translate(60 654)">
+    <rect width="624" height="398" rx="20" class="card"/>
+    <rect x="24" y="24" width="48" height="48" rx="14" fill="#edf5ef"/>
+    <use href="#image" x="48" y="48"/>
+    <text x="88" y="58" class="heading">图像处理</text><text x="565" y="57" class="number">04</text>
+    <path d="M24 92H600" class="divider"/>
+    <g class="row">
+      <use href="#dot" x="36" y="137"/><text x="56" y="146">rembg 本地抠图</text>
+      <use href="#dot" x="36" y="191"/><text x="56" y="200">SAM vit_b 量化版</text>
+      <use href="#dot" x="36" y="245"/><text x="56" y="254">Pillow 色彩管线</text>
+      <use href="#dot" x="36" y="299"/><text x="56" y="308">OpenCV 图像操作</text>
+      <use href="#dot" x="36" y="353"/><text x="56" y="362">ONNX Runtime + RapidOCR</text>
+    </g>
+  </g>
+
+  <g transform="translate(716 654)">
+    <rect width="624" height="398" rx="20" class="card"/>
+    <rect x="24" y="24" width="48" height="48" rx="14" fill="#edf5ef"/>
+    <use href="#async" x="48" y="48"/>
+    <text x="88" y="58" class="heading">异步和通信</text><text x="565" y="57" class="number">05</text>
+    <path d="M24 92H600" class="divider"/>
+    <g class="row">
+      <use href="#dot" x="36" y="131"/><text x="56" y="140">ARQ 异步任务队列</text>
+      <use href="#dot" x="36" y="177"/><text x="56" y="186">Redis 队列和 Pub/Sub</text>
+      <use href="#dot" x="36" y="223"/><text x="56" y="232">SSE 实时进度推送</text>
+      <use href="#dot" x="36" y="269"/><text x="56" y="278">独立 Worker 进程</text>
+      <use href="#dot" x="36" y="315"/><text x="56" y="324">快照恢复 + 心跳保活</text>
+    </g>
+  </g>
+
+  <g transform="translate(1372 654)">
+    <rect width="624" height="398" rx="20" class="card"/>
+    <rect x="24" y="24" width="48" height="48" rx="14" fill="#edf5ef"/>
+    <use href="#database" x="48" y="48"/>
+    <text x="88" y="58" class="heading">数据和部署</text><text x="565" y="57" class="number">06</text>
+    <path d="M24 92H600" class="divider"/>
+    <g class="row">
+      <use href="#dot" x="36" y="131"/><text x="56" y="140">PostgreSQL 业务数据 / JSONB</text>
+      <use href="#dot" x="36" y="177"/><text x="56" y="186">Redis 选区 / 队列 / 消息</text>
+      <use href="#dot" x="36" y="223"/><text x="56" y="232">MinIO 图片资产（S3）</text>
+      <use href="#dot" x="36" y="269"/><text x="56" y="278">Docker 多阶段构建</text>
+      <use href="#dot" x="36" y="315"/><text x="56" y="324">Docker Compose profile</text>
+    </g>
+  </g>
+</svg>
