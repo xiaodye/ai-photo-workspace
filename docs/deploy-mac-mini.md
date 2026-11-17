@@ -269,3 +269,10 @@ docker compose --profile deploy logs --tail=80 app
 | `docker-compose.override.example.yml` | 服务器本地配置模板（复制成 `docker-compose.override.yml` 再改） |
 | `scripts/bootstrap-mac-mini.sh` | 一条命令生成上面三个本地配置文件 |
 | `docker-compose.yml` / `docker-compose.override.yml` | 基础编排 / 生产覆盖 |
+
+## 相关文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [latency-diagnostics.md](./latency-diagnostics.md) | 线上访问慢时如何判断瓶颈在代码、服务器还是网络链路 |
+| [macmini-as-cloud-server.md](./macmini-as-cloud-server.md) | Mac mini 常驻与内网穿透配置 |
