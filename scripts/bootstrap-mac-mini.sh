@@ -61,12 +61,21 @@ if [ -f .env ] && [ "$FORCE" -eq 0 ]; then
 else
   cp .env.example .env
   python3 - <<'PY'
-import pathlib, re, secrets
+import base64, pathlib, re, secrets
+
 p = pathlib.Path('.env')
 text = p.read_text()
 text = re.sub(r'^JWT_SECRET=.*$', 'JWT_SECRET=' + secrets.token_hex(32), text, flags=re.M)
+# 用户模型 Key 的加密主密钥：随机生成一次后必须长期稳定，换值会让已保存的 Key 无法解密
+text = re.sub(
+    r'^CREDENTIAL_ENCRYPTION_KEY=.*$',
+    # Fernet 密钥 = 32 字节随机数的 urlsafe base64，用标准库即可，不依赖 cryptography
+    'CREDENTIAL_ENCRYPTION_KEY=' + base64.urlsafe_b64encode(secrets.token_bytes(32)).decode(),
+    text,
+    flags=re.M,
+)
 p.write_text(text)
-print('[生成] .env（JWT_SECRET 已随机化）')
+print('[生成] .env（JWT_SECRET 与 CREDENTIAL_ENCRYPTION_KEY 已随机化）')
 PY
   chmod 600 .env
   echo '[权限] .env 设为 600'
@@ -151,7 +160,9 @@ fi
 cat <<'EOF'
 
 下一步:
-  1. 编辑 .env：DASHSCOPE_API_KEY（接真实模型时）、确认 IMAGE_PROVIDER
-  2. 仓库 Settings 里确认 3 个 Secrets：SSH_PRIVATE_KEY / CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET
-  3. 合并到 main 触发部署，或手动运行 deploy workflow
+  1. 编辑 .env：确认 IMAGE_PROVIDER=dashscope，ALLOW_PLATFORM_KEY_FALLBACK=false
+     （模型 Key 由每个用户在自己的「模型设置」里填写，平台 Key 默认不参与）
+  2. 备份 .env 里的 CREDENTIAL_ENCRYPTION_KEY：换值会让已保存的用户 Key 全部失效
+  3. 仓库 Settings 里确认 3 个 Secrets：SSH_PRIVATE_KEY / CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET
+  4. 合并到 main 触发部署，或手动运行 deploy workflow
 EOF

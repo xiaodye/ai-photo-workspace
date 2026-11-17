@@ -96,6 +96,15 @@ export const api = {
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   /**
+   * 发送 PUT 请求整体替换资源。
+   *
+   * @param path 相对 /api 的请求路径。
+   * @param body 提交给接口的 JSON 数据。
+   * @returns
+   */
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) }),
+  /**
    * 发送 PATCH 请求更新资源。
    *
    * @param path 相对 /api 的请求路径。

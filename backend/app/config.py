@@ -32,12 +32,17 @@ class Settings(BaseSettings):
 
     # image provider: mock | dashscope
     image_provider: str = "mock"
+    # 平台 Key 只在显式开启兜底时使用，公网部署保持关闭，避免访客消耗维护者额度
     dashscope_api_key: str = ""
+    allow_platform_key_fallback: bool = False
     # 业务空间专属域名为 https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com
     dashscope_base_url: str = "https://dashscope.aliyuncs.com"
+    # 用户未指定模型名时的默认值，同时用于界面表单预填
     text_to_image_model: str = "qwen-image-3.0-pro"
     image_edit_model: str = "qwen-image-edit-max"
     planner_model: str = "qwen-plus"
+    # 加密用户 Key 的 Fernet 主密钥；API 与 Worker 必须一致，留空则无法保存或使用用户 Key
+    credential_encryption_key: str = ""
     # auto：有 rembg 用 rembg，否则四角抠图；测试强制 corner 以免下载模型
     matting_provider: str = "auto"
     # auto：有 rapidocr 则识别文字层；none 跳过；测试强制 none

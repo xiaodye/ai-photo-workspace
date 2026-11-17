@@ -62,6 +62,8 @@ class ToolSpec:
     queued: bool = True
     # 调用工具是否需要编辑会话。
     session_required: bool = False
+    # 是否必须调用云端模型；需要账号自己的模型配置，批处理按实际步骤判断
+    needs_model: bool = False
     # 素材 ID、随机种子这类参数应由服务端从上下文填入，不暴露给模型
     agent_hidden: tuple[str, ...] = field(default_factory=tuple)
     # 同一工具按参数细分说法，例如翻转要分水平与垂直，返回 None 则用 label

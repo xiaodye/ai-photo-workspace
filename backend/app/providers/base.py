@@ -70,3 +70,7 @@ class ImageProvider(Protocol):
     ) -> bytes:
         """提高分辨率，不改变构图。"""
         ...
+
+    async def aclose(self) -> None:
+        """释放底层网络客户端。"""
+        ...

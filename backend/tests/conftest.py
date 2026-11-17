@@ -2,6 +2,7 @@ import uuid
 
 import httpx
 import pytest
+from cryptography.fernet import Fernet
 from httpx import ASGITransport
 from sqlalchemy import delete
 
@@ -10,7 +11,6 @@ from app.config import get_settings
 from app.db import SessionFactory
 from app.main import app
 from app.models import User
-from app.providers import get_image_provider
 from app.queue import close_queue
 from app.storage import ensure_bucket
 
@@ -29,10 +29,31 @@ def mock_provider():
     """测试一律走占位图实现，不受本机 IMAGE_PROVIDER 配置影响，也不产生调用费用。"""
     settings = get_settings()
     original, settings.image_provider = settings.image_provider, "mock"
-    get_image_provider.cache_clear()
     yield
     settings.image_provider = original
-    get_image_provider.cache_clear()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def model_credentials():
+    """测试用独立随机主密钥，并默认开启平台兜底，避免每个用例都先配置 Key。
+
+    需要验证「无兜底」行为的用例自行关闭 ALLOW_PLATFORM_KEY_FALLBACK。
+    """
+    settings = get_settings()
+    original = (
+        settings.credential_encryption_key,
+        settings.allow_platform_key_fallback,
+        settings.dashscope_api_key,
+    )
+    settings.credential_encryption_key = Fernet.generate_key().decode()
+    settings.allow_platform_key_fallback = True
+    settings.dashscope_api_key = "test-platform-key-0000"
+    yield
+    (
+        settings.credential_encryption_key,
+        settings.allow_platform_key_fallback,
+        settings.dashscope_api_key,
+    ) = original
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -3,10 +3,12 @@ import { Link, NavLink } from 'react-router-dom'
 
 import AgentConversation from '@/components/editor/AgentConversation'
 import MessageComposer from '@/components/editor/MessageComposer'
+import ModelKeyNotice from '@/components/ModelKeyNotice'
 import Button from '@/components/ui/Button'
 import { buttonClass } from '@/components/ui/buttonStyles'
 import { useSendMessage, useTurns } from '@/hooks/useAgent'
 import { errorMessage } from '@/hooks/useAuth'
+import { useModelSettings } from '@/hooks/useModelSettings'
 import { useSessions } from '@/hooks/useSessions'
 import { formatDateTime } from '@/lib/format'
 
@@ -47,14 +49,17 @@ export default function SessionSidebar({ activeId }: { activeId: string }) {
 
 function Conversation({ sessionId }: { sessionId: string }) {
   const send = useSendMessage(sessionId)
+  const { ready } = useModelSettings()
   const { data: turns = [] } = useTurns(sessionId)
   const planActive = turns.some((turn) => turn.status === 'queued' || turn.status === 'running')
 
   return (
     <>
       <AgentConversation sessionId={sessionId} />
+      <ModelKeyNotice className="mx-3 mb-2" />
       <MessageComposer
         pending={send.isPending || planActive}
+        blocked={!ready}
         error={send.isError ? errorMessage(send.error) : null}
         placeholder={
           planActive

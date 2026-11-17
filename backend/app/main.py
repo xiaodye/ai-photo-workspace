@@ -2,13 +2,25 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 
 from app import storage
 from app.config import get_settings
+from app.credentials import ModelCredentialsUnavailable
 from app.queue import close_queue
-from app.routers import assets, auth, batches, events, health, runs, sessions
+from app.routers import (
+    assets,
+    auth,
+    batches,
+    events,
+    health,
+    model_settings,
+    runs,
+    sessions,
+)
 
 settings = get_settings()
 
@@ -27,9 +39,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.exception_handler(ModelCredentialsUnavailable)
+async def credentials_unavailable(_: Request, exc: ModelCredentialsUnavailable) -> JSONResponse:
+    """模型凭据缺失或加密不可用时，返回可直接展示给用户的提示。"""
+    return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """模型设置接口会收到密钥，校验失败时只回固定文案，不回显请求内容。"""
+    if request.url.path == "/api/model-settings":
+        return JSONResponse(
+            status_code=422, content={"detail": "设置参数格式不正确，请检查 Key 与模型名称"}
+        )
+    return await request_validation_exception_handler(request, exc)
+
+
 api = APIRouter(prefix="/api")
 api.include_router(health.router)
 api.include_router(auth.router)
+api.include_router(model_settings.router)
 api.include_router(assets.router)
 api.include_router(runs.router)
 api.include_router(sessions.router)

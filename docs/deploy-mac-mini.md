@@ -71,18 +71,22 @@ cd ~/apps/ai-photo-workspace
 
 | 产出 | 说明 |
 | --- | --- |
-| `.env` | 从 `.env.example` 复制，`JWT_SECRET` 换成 `secrets.token_hex(32)` 随机值，权限设 `600` |
+| `.env` | 从 `.env.example` 复制，随机生成 `JWT_SECRET` 与 `CREDENTIAL_ENCRYPTION_KEY`，权限设 `600` |
 | `docker-compose.override.yml` | 从模板生成：端口只绑 `127.0.0.1`、使用 `Dockerfile.local` |
 | `Dockerfile.local` | 从 `Dockerfile` 生成并替换 3 处为国内源；**上游 Dockerfile 变动导致替换点找不到时会直接报错**，不会生成坏文件 |
 | 自检 | 结尾跑 `docker compose config --quiet` |
 
-然后手填 `.env` 里机器相关的值：
+然后确认 `.env` 里这些值（`CREDENTIAL_ENCRYPTION_KEY` 已自动生成，不要改动）：
 
 | 变量 | 说明 |
 | --- | --- |
 | `S3_PUBLIC_ENDPOINT` | **对外访问对象存储的域名**。留空会回退 `http://localhost:7313`，外网图片打不开。`docker-compose.yml` 通过 `${S3_PUBLIC_ENDPOINT:-http://localhost:7313}` 插值读取，**换域名只改这一行，不用动 compose 或 override** |
-| `DASHSCOPE_API_KEY` | 接真实模型时必填；`IMAGE_PROVIDER=mock` 时可不填 |
-| `IMAGE_PROVIDER` | `mock`（本地占位图，无费用）或 `dashscope`（真实模型） |
+| `CREDENTIAL_ENCRYPTION_KEY` | 用户模型 Key 的加密主密钥，bootstrap 已随机生成。**必须长期稳定并单独备份**；换值后所有已保存的用户 Key 都无法解密，需要用户重新填写。API 与 Worker 必须一致 |
+| `ALLOW_PLATFORM_KEY_FALLBACK` | 是否允许未配置 Key 的访客使用平台额度，**公网部署保持 `false`** |
+| `DASHSCOPE_API_KEY` | 仅在 `ALLOW_PLATFORM_KEY_FALLBACK=true` 时作为兜底使用；正常部署留空 |
+| `IMAGE_PROVIDER` | `mock`（仅本地开发）或 `dashscope`（真实模型，公网部署必须用这个） |
+
+> 模型 Key 不放在 `.env`：每个用户登录后在自己的「模型设置」里填写，费用由各自百炼账户承担。服务端只保存加密后的密文与尾号。
 
 > `.gitignore` 已排除这三个本地文件，避免误提交密钥或机器相关配置。手动准备也可以，按上面表格里的来源逐个复制即可。
 

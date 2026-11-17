@@ -228,6 +228,7 @@ SPLIT_LAYERS = ToolSpec(
     ),
     params=SplitLayersIn,
     handler=split_layers_exec,
+    needs_model=True,
     queued=True,
     session_required=True,
 )
@@ -241,6 +242,7 @@ PROMOTE_OBJECT = ToolSpec(
     ),
     params=PromoteIn,
     handler=promote_object_exec,
+    needs_model=True,
     queued=True,
     session_required=True,
     agent_hidden=HIDDEN_MASK,

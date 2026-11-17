@@ -5,7 +5,6 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from app.agent import graph
-from app.agent.llm import planner
 from app.config import get_settings
 from app.tasks.tools import run_tool
 from tests.canvas import apply, error_of, layers, scene, select, settle
@@ -202,18 +201,19 @@ async def test_conversation_is_returned_in_order(signed_in: httpx.AsyncClient, f
     assert [turn["goal"] for turn in turns] == ["第一句", "第二句"]
 
 
-async def test_missing_api_key_fails_the_turn(signed_in: httpx.AsyncClient, monkeypatch):
-    """模型不可用时必须明确失败，不能伪造成功结果。"""
+async def test_missing_model_key_blocks_the_turn(signed_in: httpx.AsyncClient, monkeypatch):
+    """没有可用凭据时必须明确拒绝，不能匿名调用平台模型。"""
     settings = get_settings()
+    monkeypatch.setattr(settings, "allow_platform_key_fallback", False)
     monkeypatch.setattr(settings, "dashscope_api_key", "")
-    planner.cache_clear()
     session_id = (await open_session(signed_in))["id"]
 
-    turn = await send(signed_in, session_id, "换个背景")
+    response = await signed_in.post(
+        f"/api/sessions/{session_id}/messages", json={"text": "换个背景"}
+    )
 
-    planner.cache_clear()
-    assert turn["status"] == "failed"
-    assert "DASHSCOPE_API_KEY" in turn["error"]
+    assert response.status_code == 403
+    assert "模型设置" in response.json()["detail"]
 
 
 async def test_blank_message_is_rejected(signed_in: httpx.AsyncClient):

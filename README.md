@@ -96,7 +96,7 @@
 cp .env.example .env
 ```
 
-已有 `.env` 时请直接检查配置，不要覆盖。默认图片服务为 Mock，可先验证页面与任务流程；真实 AI 图片处理及自然语言规划的配置见下文。
+已有 `.env` 时请直接检查配置，不要覆盖。默认图片服务为 Mock，可先验证页面与任务流程；用户模型 Key 的保存与使用见下文「模型 Key 与公网部署」。
 
 ### 2. 启动基础设施
 
@@ -138,19 +138,34 @@ pnpm dev
 
 | 变量                                                         | 说明                                                                                                               |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `IMAGE_PROVIDER`                                             | `mock` 返回本地占位图片；`dashscope` 调用真实图片模型，需要配置 `DASHSCOPE_API_KEY`。                              |
-| `DASHSCOPE_API_KEY` / `DASHSCOPE_BASE_URL`                   | 图片模型与对话规划使用的密钥及服务地址，按实际业务空间配置。                                                       |
-| `TEXT_TO_IMAGE_MODEL` / `IMAGE_EDIT_MODEL` / `PLANNER_MODEL` | 分别指定生图、图片编辑与对话规划模型。                                                                             |
+| `IMAGE_PROVIDER`                                             | `mock` 返回本地占位图片，仅限本地开发；`dashscope` 调用真实图片模型。                                              |
+| `CREDENTIAL_ENCRYPTION_KEY`                                  | 加密用户模型 Key 的 Fernet 主密钥，必填；API 与 Worker 必须一致，换值后已保存的 Key 将无法解密。                   |
+| `ALLOW_PLATFORM_KEY_FALLBACK`                                | 是否允许未配置 Key 的访客回退使用平台 Key。默认 `false`，公网部署务必保持关闭。                                    |
+| `DASHSCOPE_API_KEY` / `DASHSCOPE_BASE_URL`                   | 平台兜底用的 Key（仅在开关打开时生效）与模型服务地址。                                                             |
+| `TEXT_TO_IMAGE_MODEL` / `IMAGE_EDIT_MODEL` / `PLANNER_MODEL` | 用户未填写模型名时的默认值，同时用于设置面板预填。                                                                 |
 | `MATTING_PROVIDER`                                           | `auto` 优先使用 rembg，失败时降级；`rembg` 强制使用模型并在失败时报错；`corner` 使用简化处理，不代表真实模型效果。 |
 | `OCR_PROVIDER`                                               | `auto` 尝试使用 RapidOCR 识别文字，不可用时跳过；`none` 不拆分文字层。                                             |
 | `DATABASE_URL` / `REDIS_URL` / `S3_*`                        | 数据库、任务队列与对象存储连接配置；`S3_PUBLIC_ENDPOINT` 用于浏览器访问签名图片 URL。                              |
 | `JWT_SECRET` / `JWT_TTL_HOURS`                               | 登录态签名密钥与有效期；生产环境必须更换默认密钥。                                                                 |
 
+### 模型 Key 与公网部署
+
+模型 Key 属于**用户自己的账号配置**，不存在「一份 Key 全站共用」的默认路径：
+
+- 登录后打开左侧账户菜单 → **模型设置**，填入自己的 DashScope（阿里云百炼）API Key 与三个模型名即可。Key 加密后存在 `users` 表，读取接口只返回尾号提示，任何时候都不会把明文返回浏览器。
+- 保存时可选择先用一次 1 token 的请求验证 Key；验证失败不会覆盖原配置。同一账号的验证有 20 秒频率限制。
+- 每个图片生成、编辑与对话规划任务都会按任务归属读取该账号的 Key，在任务内创建独立客户端并在结束时释放，不跨账号复用。
+- 未配置 Key 的用户提交云端任务会直接返回 403，不会创建排队任务，也不会回退到平台 Key（除非显式开启 `ALLOW_PLATFORM_KEY_FALLBACK`）。
+- 生产环境 `IMAGE_PROVIDER=mock` 会被拒绝：占位图只服务本地开发。
+- `CREDENTIAL_ENCRYPTION_KEY` 必须是稳定的 Fernet 主密钥，API 与 Worker 共用同一个值；更换后旧 Key 需要用户重新填写。
+
+> 公网部署检查清单：`APP_ENV=production`、`IMAGE_PROVIDER=dashscope`、`ALLOW_PLATFORM_KEY_FALLBACK=false`、`CREDENTIAL_ENCRYPTION_KEY` 已设置且已备份、`JWT_SECRET` 已更换。
+
 ### Mock 与真实模型
 
 - **图片 Mock**：`IMAGE_PROVIDER=mock` 不调用收费图片模型，适合验证交互和任务流程，但不提供真实修图效果。
-- **自然语言规划**：即使图片使用 Mock，对话规划仍需要 `DASHSCOPE_API_KEY` 和可用的 `PLANNER_MODEL`，可能产生模型调用费用。
-- **真实图片处理**：将 `IMAGE_PROVIDER` 改为 `dashscope` 并配置可用的图片模型。图片会发送到对应模型服务，请注意素材隐私及服务方计费规则。
+- **自然语言规划**：对话规划使用当前账号的 Key 与规划模型，同样会消耗该账号的额度。
+- **真实图片处理**：将 `IMAGE_PROVIDER` 改为 `dashscope`。图片会发送到模型服务，请注意素材隐私及服务方计费规则。
 - **本地视觉模型**：rembg、SAM 等能力首次使用时可能下载模型权重，耗时受网络、硬件及图片尺寸影响；图片 Mock 不会同时禁用本地视觉模型。
 - **轻量流程调试**：不需要本地视觉模型时，可使用 `MATTING_PROVIDER=corner`、`OCR_PROVIDER=none`；此时抠图与点选为简化结果，不能用于评估模型质量。
 
@@ -175,7 +190,7 @@ docker compose --profile deploy exec app alembic upgrade head
 
 镜像采用多阶段构建，前端产物由后端同源托管，访问 `http://localhost:7302` 即可。首次部署及包含数据库结构变更的更新均需执行迁移。
 
-公网部署前请更换开发用密钥与数据库、对象存储凭据，配置 HTTPS，并将 `S3_PUBLIC_ENDPOINT` 设为浏览器可访问的对象存储地址；不要直接将开发配置中的基础设施端口暴露到公网。
+公网部署前请更换开发用密钥与数据库、对象存储凭据，配置 HTTPS，并将 `S3_PUBLIC_ENDPOINT` 设为浏览器可访问的对象存储地址；不要直接将开发配置中的基础设施端口暴露到公网。`.env` 必须包含 `CREDENTIAL_ENCRYPTION_KEY`（用户 Key 的加密主密钥，需备份），并保持 `ALLOW_PLATFORM_KEY_FALLBACK=false`；模型 Key 由各用户自行在界面中配置。
 
 ### 持续部署（CI/CD）
 

@@ -5,7 +5,7 @@ import io
 import httpx
 from PIL import Image
 
-from app.config import get_settings
+from app.credentials import ModelCredentials
 from app.providers.base import (
     EditRequest,
     GenerateRequest,
@@ -37,17 +37,18 @@ class DashScopeImageProvider(ImageProvider):
 
     name = "dashscope"
 
-    def __init__(self) -> None:
-        settings = get_settings()
-        if not settings.dashscope_api_key:
-            raise ProviderError("未配置 DASHSCOPE_API_KEY")
-        self._model = settings.text_to_image_model
-        self._edit_model = settings.image_edit_model
+    def __init__(self, credentials: ModelCredentials) -> None:
+        # 模型名与 Key 都属于当前账号，不能跨用户复用客户端
+        self._model = credentials.text_to_image_model
+        self._edit_model = credentials.image_edit_model
         self._client = httpx.AsyncClient(
-            base_url=settings.dashscope_base_url,
-            headers={"Authorization": f"Bearer {settings.dashscope_api_key}"},
+            base_url=credentials.base_url,
+            headers={"Authorization": f"Bearer {credentials.api_key}"},
             timeout=30.0,
         )
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
     async def generate(
         self, request: GenerateRequest, on_progress: ProgressCallback | None = None
@@ -61,10 +62,8 @@ class DashScopeImageProvider(ImageProvider):
     ) -> list[bytes]:
         if on_progress:
             await on_progress(20, "提交编辑")
-        response = await self._client.post(
-            _EDIT_PATH,
-            json=self._edit_payload(request),
-            timeout=_EDIT_TIMEOUT,
+        response = await self._request(
+            "POST", _EDIT_PATH, json=self._edit_payload(request), timeout=_EDIT_TIMEOUT
         )
         urls = _extract_urls(self._parse(response).get("output", {}))
         if on_progress:
@@ -129,10 +128,8 @@ class DashScopeImageProvider(ImageProvider):
         }
 
     async def _submit(self, path: str, payload: dict) -> str:
-        response = await self._client.post(
-            path,
-            json=payload,
-            headers={"X-DashScope-Async": "enable"},
+        response = await self._request(
+            "POST", path, json=payload, headers={"X-DashScope-Async": "enable"}
         )
         body = self._parse(response)
         task_id = body.get("output", {}).get("task_id")
@@ -147,7 +144,7 @@ class DashScopeImageProvider(ImageProvider):
         started = loop.time()
 
         while True:
-            response = await self._client.get(_TASK_PATH.format(task_id=task_id))
+            response = await self._request("GET", _TASK_PATH.format(task_id=task_id))
             output = self._parse(response).get("output", {})
             status = output.get("task_status", "UNKNOWN")
 
@@ -164,8 +161,15 @@ class DashScopeImageProvider(ImageProvider):
                     await on_progress(min(82, 38 + int(waited / 2.2)), "生成中")
 
             if loop.time() > deadline:
-                raise ProviderError("生成任务超时")
+                raise ProviderError("模型任务等待超时，请稍后重试")
             await asyncio.sleep(_POLL_INTERVAL)
+
+    async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
+        """发送模型请求，把连接类异常统一成可展示的服务错误。"""
+        try:
+            return await self._client.request(method, path, **kwargs)
+        except httpx.RequestError as exc:
+            raise ProviderError("模型服务连接中断，请稍后重试") from exc
 
     async def _download(self, url: str) -> bytes:
         """结果 URL 有效期 24 小时，须立即取回并转存到自有存储。"""

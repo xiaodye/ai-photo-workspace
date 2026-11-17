@@ -102,6 +102,20 @@ jobs:
             exit 1
           fi
 
+          # 用户模型 Key 的加密主密钥必须存在且非空，否则部署“成功”但用户保存 Key 时才 503
+          key="$(sed -n 's/^CREDENTIAL_ENCRYPTION_KEY=//p' .env | head -1)"
+          if [ -z "$key" ]; then
+            echo "::error::.env 缺少 CREDENTIAL_ENCRYPTION_KEY，用户将无法保存自己的模型 Key"
+            echo "  生成：python3 -c \"import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())\""
+            echo "  写入 .env 后重启 app 与 worker；该值必须长期稳定并做好备份"
+            exit 1
+          fi
+
+          # 平台额度兜底一旦打开，未配置 Key 的访客会消耗站点额度，生产环境明确提示
+          if grep -qE '^ALLOW_PLATFORM_KEY_FALLBACK=(true|1|yes)$' .env; then
+            echo "::warning::ALLOW_PLATFORM_KEY_FALLBACK 已开启：未配置 Key 的访客会消耗平台额度"
+          fi
+
           echo "本地配置齐全：.env / docker-compose.override.yml / Dockerfile.local"
           EOS
 

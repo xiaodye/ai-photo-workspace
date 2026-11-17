@@ -1,17 +1,19 @@
 import { Button, Popover } from '@heroui/react'
-import { LogOut } from 'lucide-react'
+import { KeyRound, LogOut } from 'lucide-react'
 
 import ThemeSwitcher from '@/components/ThemeSwitcher'
 
 export default function AccountMenu({
   username,
   onSignOut,
+  onOpenSettings,
   isSigningOut,
   isOpen,
   onOpenChange,
 }: {
   username?: string
   onSignOut: () => void
+  onOpenSettings: () => void
   isSigningOut: boolean
   isOpen: boolean
   onOpenChange: (isOpen: boolean) => void
@@ -36,11 +38,19 @@ export default function AccountMenu({
           <Popover.Heading className="truncate text-sm font-medium">
             {username ?? '账户设置'}
           </Popover.Heading>
-          <div className="mt-4 flex items-center justify-between gap-4">
-            <span className="text-muted text-xs">主题切换</span>
-            <ThemeSwitcher />
-          </div>
-          <div className="border-line mt-4 border-t pt-2">
+          <div className="border-line mt-4 space-y-1 border-t pt-2">
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="text-muted hover:bg-soft hover:text-ink flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-colors"
+            >
+              <KeyRound size={16} strokeWidth={1.8} aria-hidden />
+              模型设置
+            </button>
+            <div className="flex items-center justify-between gap-4 px-2 py-2">
+              <span className="text-muted text-xs">主题切换</span>
+              <ThemeSwitcher />
+            </div>
             <button
               type="button"
               onClick={onSignOut}

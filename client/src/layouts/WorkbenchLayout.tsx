@@ -5,7 +5,9 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import BrandMark from '@/components/BrandMark'
 import ToastHost from '@/components/ToastHost'
 import AccountMenu from '@/components/AccountMenu'
+import ModelSettingsDialog from '@/components/ModelSettingsDialog'
 import { useAuthActions, useCurrentUser } from '@/hooks/useAuth'
+import { useModelSettingsUi } from '@/stores/modelSettings'
 
 const NAV_ITEMS = [
   { to: '/create', label: '创作', icon: Sparkles },
@@ -21,6 +23,8 @@ export default function WorkbenchLayout() {
   const { logout } = useAuthActions()
   const [navOpen, setNavOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const settingsOpen = useModelSettingsUi((state) => state.open)
+  const setSettingsOpen = useModelSettingsUi((state) => state.setOpen)
 
   /**
    * 退出当前登录状态并交由认证路由处理后续访问。
@@ -92,6 +96,10 @@ export default function WorkbenchLayout() {
             <AccountMenu
               username={user?.username}
               onSignOut={signOut}
+              onOpenSettings={() => {
+                setAccountMenuOpen(false)
+                setSettingsOpen(true)
+              }}
               isSigningOut={logout.isPending}
               isOpen={accountMenuOpen}
               onOpenChange={setAccountMenuOpen}
@@ -103,6 +111,7 @@ export default function WorkbenchLayout() {
       <main className="min-w-0 flex-1 overflow-auto">
         <Outlet />
       </main>
+      <ModelSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <ToastHost />
     </div>
   )
