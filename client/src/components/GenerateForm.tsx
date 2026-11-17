@@ -9,10 +9,12 @@ const COUNTS = [1, 2, 4, 6]
 export default function GenerateForm({
   onSubmit,
   pending,
+  blocked = false,
   defaultPrompt = '',
 }: {
   onSubmit: (input: GenerateInput) => void
   pending: boolean
+  blocked?: boolean
   defaultPrompt?: string
 }) {
   const [prompt, setPrompt] = useState(defaultPrompt)
@@ -21,7 +23,7 @@ export default function GenerateForm({
   const [negative, setNegative] = useState('')
   const [advanced, setAdvanced] = useState(false)
 
-  const canSubmit = prompt.trim().length > 0 && !pending
+  const canSubmit = prompt.trim().length > 0 && !pending && !blocked
 
   return (
     <form
@@ -84,7 +86,11 @@ export default function GenerateForm({
         </Button>
       </div>
       <p className="text-faint px-3 pb-2 text-[11px]">
-        {pending ? '任务已提交，稍后会跳到候选页' : '回车生成 · Shift+Enter 换行'}
+        {blocked
+          ? '配置自己的 API Key 后才能生成'
+          : pending
+            ? '任务已提交，稍后会跳到候选页'
+            : '回车生成 · Shift+Enter 换行'}
       </p>
 
       {advanced && (

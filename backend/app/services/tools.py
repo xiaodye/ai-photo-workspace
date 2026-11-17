@@ -4,12 +4,13 @@ import uuid
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.credentials import ModelCredentialsUnavailable, mask
 from app.layers import LayerDocument
 from app.models import Asset, ToolRun
 from app.models.tool_run import RunStatus
-from app.providers import ProviderError
+from app.providers import ProviderError, model_scope
 from app.queue import enqueue
-from app.services import assets, runs, sessions
+from app.services import assets, model_settings, runs, sessions
 from app.tools import UnknownTool, spec_of
 from app.tools.context import ToolError
 
@@ -43,7 +44,12 @@ async def submit(
     if spec.session_required and session_id is None:
         raise InvalidParams("此工具需要在编辑会话中使用")
 
-    run = await runs.create(session, user_id, tool, validate(tool, params), session_id)
+    parsed = validate(tool, params)
+    if model_settings.needs_model(tool, parsed):
+        # 准入前置：没有可用凭据就不要建任务，避免排队之后才失败
+        await model_settings.require(session, user_id)
+
+    run = await runs.create(session, user_id, tool, parsed, session_id)
     if spec.queued:
         await enqueue(TASK, run.id)
     else:
@@ -54,13 +60,18 @@ async def submit(
 
 async def execute(session: AsyncSession, run: ToolRun) -> None:
     """统一的执行外壳：状态流转与失败兜底集中在此，具体工具只返回结果。"""
+    credentials = None
     try:
         spec = spec_of(run.tool)
         await runs.start(session, run)
-        result = await spec.handler(session, run)
+        if model_settings.needs_model(run.tool, run.params):
+            credentials = await model_settings.require(session, run.user_id)
+        async with model_scope(credentials):
+            result = await spec.handler(session, run)
         await _record(session, run, result)
-    except (ProviderError, UnknownTool, ToolError) as exc:
-        await runs.finish(session, run, status=RunStatus.FAILED, error=str(exc))
+    except (ProviderError, UnknownTool, ToolError, ModelCredentialsUnavailable) as exc:
+        error = mask(str(exc), credentials.api_key if credentials else "")
+        await runs.finish(session, run, status=RunStatus.FAILED, error=error)
     except Exception:
         logger.exception("工具执行异常 tool=%s run_id=%s", run.tool, run.id)
         await session.rollback()

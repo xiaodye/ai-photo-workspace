@@ -164,6 +164,7 @@ GENERATE_MARKETING = ToolSpec(
     ),
     params=GenerateMarketingIn,
     handler=generate_marketing_exec,
+    needs_model=True,
     queued=True,
     session_required=True,
 )

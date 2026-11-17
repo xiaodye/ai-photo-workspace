@@ -130,6 +130,7 @@ REPLACE_BACKGROUND = ToolSpec(
     ),
     params=ReplaceBackgroundIn,
     handler=replace_background_exec,
+    needs_model=True,
     queued=True,
     session_required=True,
     agent_hidden=("negative_prompt",),
@@ -141,6 +142,7 @@ EXPAND_CANVAS = ToolSpec(
     description="把当前画布扩展到指定比例，并自然补全新增区域。主体保持完整，不要裁切。",
     params=ExpandCanvasIn,
     handler=expand_canvas_exec,
+    needs_model=True,
     queued=True,
     session_required=True,
 )
@@ -151,6 +153,7 @@ UPSCALE_IMAGE = ToolSpec(
     description="提高当前画布分辨率。scale 为 2 或 4，默认 2 倍。不要用它换内容或改构图。",
     params=UpscaleImageIn,
     handler=upscale_image_exec,
+    needs_model=True,
     queued=True,
     session_required=True,
 )

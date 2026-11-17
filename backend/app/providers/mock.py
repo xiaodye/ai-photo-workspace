@@ -64,6 +64,9 @@ class MockImageProvider(ImageProvider):
             await on_progress(90, "保存结果")
         return _png(enlarged)
 
+    async def aclose(self) -> None:
+        """占位图实现不持有网络连接。"""
+
     def _compose(
         self, source: Image.Image, width: int, height: int, seed: int, prompt: str
     ) -> bytes:

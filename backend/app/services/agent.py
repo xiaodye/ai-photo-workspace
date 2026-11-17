@@ -7,10 +7,12 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app import agent
 from app.agent import plan as plan_mod
+from app.credentials import ModelCredentialsUnavailable, mask
 from app.layers import Layer, LayerDocument, LayerKind
 from app.models import AgentRun, EditSession, ToolRun
 from app.models.tool_run import RunStatus
-from app.services import assets, runs, selections, tools
+from app.providers import model_scope
+from app.services import assets, model_settings, runs, selections, tools
 from app.tools import spec_of
 
 logger = logging.getLogger(__name__)
@@ -67,12 +69,15 @@ async def respond(session: AsyncSession, record: EditSession, goal: str) -> Agen
     """规划一轮指令并落库。多步计划先停住等确认，单步直接开跑。"""
     revision = record.revision
     reply, steps, error = "", [], None
+    # 规划模型按当前账号的 Key 调用，未配置时直接拒绝而不是匿名调用
+    credentials = await model_settings.require(session, record.user_id)
 
     try:
-        reply, steps = await agent.run(goal, await describe(session, record))
+        async with model_scope(credentials):
+            reply, steps = await agent.run(goal, await describe(session, record))
         steps = await _pin_selection(session, record, steps)
     except agent.PlannerUnavailable as exc:
-        error = str(exc)
+        error = mask(str(exc), credentials.api_key)
     except Exception:
         logger.exception("指令规划异常 session_id=%s", record.id)
         await session.rollback()
@@ -131,6 +136,7 @@ def _wants_mask(tool: str) -> bool:
 async def confirm(session: AsyncSession, record: EditSession, turn_id: uuid.UUID) -> AgentRun:
     turn = await _get(session, record, turn_id)
     steps = _copy(turn.plan)
+    await _require_for(session, record, steps)
     waiting = [step for step in steps if step["status"] == plan_mod.WAITING]
     if turn.status is not RunStatus.QUEUED and not waiting:
         raise CannotConfirm
@@ -213,9 +219,20 @@ async def _advance(session: AsyncSession, turn: AgentRun) -> AgentRun:
             if spec_of(step["tool"]).needs_approval and not step.get("approved"):
                 step["status"] = plan_mod.WAITING
                 continue
-            run = await tools.submit(
-                session, turn.user_id, step["tool"], step["params"], turn.session_id
-            )
+            try:
+                run = await tools.submit(
+                    session, turn.user_id, step["tool"], step["params"], turn.session_id
+                )
+            except ModelCredentialsUnavailable as exc:
+                # 执行期间配置被删除：把这一步标记失败，不要让整轮接口报 500
+                step["status"] = plan_mod.FAILED
+                turn.plan = steps
+                turn.error = str(exc)
+                turn.status = RunStatus(plan_mod.settle(steps))
+                _touch(turn)
+                await session.commit()
+                await session.refresh(turn)
+                return turn
             step["run_id"] = str(run.id)
             step["status"] = run.status.value
             turn.plan = steps
@@ -233,6 +250,12 @@ async def _advance(session: AsyncSession, turn: AgentRun) -> AgentRun:
     await session.commit()
     await session.refresh(turn)
     return turn
+
+
+async def _require_for(session: AsyncSession, record: EditSession, steps: list[dict]) -> None:
+    """计划里出现需要模型的步骤时，先确认账号有可用凭据。"""
+    if any(model_settings.needs_model(step["tool"], step["params"]) for step in steps):
+        await model_settings.require(session, record.user_id)
 
 
 async def _cancel_queued_runs(session: AsyncSession, steps: list[dict]) -> None:

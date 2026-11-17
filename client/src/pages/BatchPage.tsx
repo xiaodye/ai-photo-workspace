@@ -5,10 +5,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Asset } from '@/api/assets'
 import { isTerminal } from '@/api/runs'
 import ImageDropzone from '@/components/ImageDropzone'
+import ModelKeyNotice from '@/components/ModelKeyNotice'
 import ProgressBar from '@/components/ui/ProgressBar'
 import { useCreateBatch, useBatch, useBatches, useExportBatch } from '@/hooks/useBatch'
 import { errorMessage } from '@/hooks/useAuth'
 import { useAssetLibrary, useUploadAsset } from '@/hooks/useAssets'
+import { useModelSettings } from '@/hooks/useModelSettings'
 import { formatDateTime } from '@/lib/format'
 import {
   BATCH_STEPS,
@@ -22,6 +24,8 @@ import {
 import { toast } from '@/stores/toasts'
 
 const MAX_IMAGES = 20
+// 只有这几个批处理步骤会调用云端模型，其余步骤纯本地执行
+const CLOUD_OPS = new Set(['replace_background', 'upscale_image', 'expand_canvas'])
 
 export default function BatchPage() {
   const { runId = '' } = useParams()
@@ -36,7 +40,9 @@ function Compose() {
   const { data: history = [] } = useBatches()
   const [assets, setAssets] = useState<Asset[]>([])
   const [draft, setDraft] = useState<BatchDraft>(EMPTY_DRAFT)
+  const { ready } = useModelSettings()
   const blocked = draftReady(draft, assets.length)
+  const needsKey = !ready && operationsOf(draft).some((op) => CLOUD_OPS.has(op.tool))
 
   /**
    * 将素材加入批处理列表，去重并限制数量。
@@ -54,7 +60,7 @@ function Compose() {
    * 在配置满足条件后创建批处理任务并跳转到观察页。
    */
   const start = () => {
-    if (blocked) return
+    if (blocked || needsKey) return
     create.mutate(
       {
         asset_ids: assets.map((asset) => asset.id),
@@ -68,6 +74,7 @@ function Compose() {
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
       <h1 className="text-ink text-2xl font-semibold tracking-tight">批量</h1>
+      <ModelKeyNotice className="mt-4" />
       <p className="text-muted mt-1 mb-8 text-sm">
         对多张图走同一套像素处理：去背景、换背景、调色、超分、扩图、投放尺寸。
       </p>
@@ -126,13 +133,14 @@ function Compose() {
       <div className="mt-8 flex items-center gap-3">
         <button
           type="button"
-          disabled={Boolean(blocked) || create.isPending}
+          disabled={Boolean(blocked) || needsKey || create.isPending}
           onClick={start}
           className="bg-action hover:bg-action-hover rounded-control px-4 py-2 text-sm font-medium text-action-foreground disabled:opacity-40"
         >
           {create.isPending ? '提交中…' : '开始处理'}
         </button>
         {blocked && <p className="text-faint text-xs">{blocked}</p>}
+        {needsKey && <p className="text-faint text-xs">配置自己的 API Key 后才能执行这些步骤</p>}
         {create.isError && <p className="text-danger text-xs">{errorMessage(create.error)}</p>}
       </div>
 

@@ -1,11 +1,21 @@
 @import 'tailwindcss';
+/* base 层提供 overlay 的 z-index、全局边框继承与浮层动画关键帧，弹窗/浮层依赖它 */
+@import '@heroui/styles/base' layer(base);
 @import '@heroui/styles/themes/default';
+/* 共享组件必须最先引入，父组件样式才能正确覆盖它们 */
+@import '@heroui/styles/components/close-button.css' layer(components);
+@import '@heroui/styles/components/description.css' layer(components);
+@import '@heroui/styles/components/field-error.css' layer(components);
+@import '@heroui/styles/components/label.css' layer(components);
+@import '@heroui/styles/components/link.css' layer(components);
 @import '@heroui/styles/components/button.css' layer(components);
 @import '@heroui/styles/components/checkbox.css' layer(components);
 @import '@heroui/styles/components/input.css' layer(components);
+@import '@heroui/styles/components/textfield.css' layer(components);
 @import '@heroui/styles/components/textarea.css' layer(components);
 @import '@heroui/styles/components/progress-bar.css' layer(components);
 @import '@heroui/styles/components/popover.css' layer(components);
+@import '@heroui/styles/components/modal.css' layer(components);
 @import '@heroui/styles/utilities';
 
 :root {
@@ -63,6 +73,10 @@
   --color-brand-soft: #2c392d;
   --color-danger: #f28a8a;
   --color-success: #7acb9c;
+  --color-warning: #e8c877;
+  --color-warning-soft: #2f2818;
+  --color-warning-border: #4a3f24;
+  --color-warning-ink: #f0dcae;
   --color-action: #ededed;
   --color-action-hover: #ffffff;
   --color-action-foreground: #181818;
@@ -149,6 +163,10 @@
 
   --color-danger: #d95656;
   --color-success: #3b8a61;
+  --color-warning: #c98a1f;
+  --color-warning-soft: #fdf6e3;
+  --color-warning-border: #f0e0b5;
+  --color-warning-ink: #7a5a12;
   --color-action: #181818;
   --color-action-hover: #262626;
   --color-action-foreground: #fff;

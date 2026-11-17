@@ -13,7 +13,7 @@ from app.edits.pixels import adjust, encode, letterbox, remove_background
 from app.models import Asset, ToolRun
 from app.models.asset import AssetKind, AssetSource
 from app.models.tool_run import RunStatus
-from app.providers import EditRequest, get_image_provider
+from app.providers import EditRequest, get_image_provider, redact
 from app.ratios import DELIVERY_RATIOS, Ratio, cover_size, size_of
 from app.schemas.asset import AssetOut
 from app.schemas.batch import BatchIn, BatchItemOut, BatchOpIn, BatchOut
@@ -142,7 +142,8 @@ async def execute(session: AsyncSession, run: ToolRun) -> dict:
             outputs = await process_asset(session, run.user_id, source, payload)
         except Exception as exc:
             item["status"] = "failed"
-            item["error"] = str(exc) or "处理失败"
+            # 逐项错误会直接展示给用户，先去掉可能回显的 Key
+            item["error"] = redact(str(exc)) or "处理失败"
             continue
         item["status"] = "succeeded"
         item["output_ids"] = [str(asset.id) for asset in outputs]

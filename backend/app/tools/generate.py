@@ -11,5 +11,6 @@ GENERATE_IMAGE = ToolSpec(
     ),
     params=GenerateIn,
     handler=generation.execute,
+    needs_model=True,
     agent_hidden=("seed", "reference_asset_ids"),
 )

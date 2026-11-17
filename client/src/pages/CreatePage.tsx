@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import AssetLibrary from '@/components/AssetLibrary'
 import GenerateForm from '@/components/GenerateForm'
 import ImageDropzone from '@/components/ImageDropzone'
+import ModelKeyNotice from '@/components/ModelKeyNotice'
 import { errorMessage } from '@/hooks/useAuth'
 import { useAssetLibrary, useUploadAsset } from '@/hooks/useAssets'
+import { useModelSettings } from '@/hooks/useModelSettings'
 import { useGenerate } from '@/hooks/useRun'
 import { useCreateSession } from '@/hooks/useSessions'
 import { readPromptDraft, savePromptDraft } from '@/lib/promptDraft'
@@ -15,6 +17,7 @@ export default function CreatePage() {
   const upload = useUploadAsset()
   const generate = useGenerate()
   const createSession = useCreateSession()
+  const { ready } = useModelSettings()
 
   /**
    * 以选中的素材建立会话并进入编辑器。
@@ -31,9 +34,12 @@ export default function CreatePage() {
     <div className="mx-auto max-w-4xl px-8 py-10">
       <h1 className="text-ink mb-6 text-2xl font-semibold tracking-tight">创作</h1>
 
+      <ModelKeyNotice className="mb-4" />
+
       <GenerateForm
         defaultPrompt={readPromptDraft()}
         pending={generate.isPending}
+        blocked={!ready}
         onSubmit={(input) =>
           generate.mutate(input, {
             /**
