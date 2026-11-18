@@ -247,7 +247,7 @@ client/
 └── tsconfig*.json      TypeScript 配置
 
 .github/workflows/    CI（PR 校验）与 CD（合并 main 自动部署）
-docs/                 部署与运维文档（部署流水线、Mac mini 常驻配置、延迟诊断）
+docs/                 部署与运维文档（部署流水线、Mac mini 常驻配置、延迟与内存诊断）
 docker-compose.yml   基础设施 + deploy profile
 Dockerfile           多阶段构建：前端构建 → 后端同源托管
 ```

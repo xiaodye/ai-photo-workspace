@@ -1,3 +1,4 @@
+import time
 import uuid
 from io import BytesIO
 
@@ -455,3 +456,43 @@ def test_flatten_can_keep_transparent_background():
 
     assert flat.getpixel((4, 4))[3] == 0
     assert flat.getpixel((40, 40))[3] == 255
+
+
+def test_release_idle_keeps_busy_session(monkeypatch):
+    """有推理在跑时不能释放会话，否则会把别的请求正在用的模型关掉。"""
+    from app.edits import segment
+
+    monkeypatch.setattr(segment, "_sam", object(), raising=False)
+    monkeypatch.setattr(segment, "_last_used", 0.0, raising=False)
+    monkeypatch.setattr(segment, "_busy", 1, raising=False)
+
+    assert segment.release_idle(ttl=0.0) is False
+    assert segment._sam is not None
+
+
+def test_release_idle_frees_session_after_ttl(monkeypatch):
+    """闲置超过 TTL 后释放会话与特征缓存，返回值反映是否真的释放。"""
+    from app.edits import segment
+
+    monkeypatch.setattr(segment, "_sam", object(), raising=False)
+    monkeypatch.setattr(segment, "_busy", 0, raising=False)
+    monkeypatch.setattr(segment, "_last_used", 0.0, raising=False)
+    segment._embeddings["stale"] = object()
+
+    assert segment.release_idle(ttl=0.0) is True
+    assert segment._sam is None
+    assert not segment._embeddings
+    # 已经释放过就不该反复触发 gc
+    assert segment.release_idle(ttl=0.0) is False
+
+
+def test_release_idle_keeps_recent_session(monkeypatch):
+    """刚用过的会话要留着，避免每次点选都重新加载模型。"""
+    from app.edits import segment
+
+    monkeypatch.setattr(segment, "_sam", object(), raising=False)
+    monkeypatch.setattr(segment, "_busy", 0, raising=False)
+    monkeypatch.setattr(segment, "_last_used", time.monotonic(), raising=False)
+
+    assert segment.release_idle(ttl=600.0) is False
+    assert segment._sam is not None

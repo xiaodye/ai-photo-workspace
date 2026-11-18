@@ -321,4 +321,5 @@ docker compose exec -T app /app/backend/.venv/bin/python \
 | 文档 | 内容 |
 | --- | --- |
 | [latency-diagnostics.md](./latency-diagnostics.md) | 线上访问慢时如何判断瓶颈在代码、服务器还是网络链路 |
+| [container-memory-diagnostics.md](./container-memory-diagnostics.md) | 容器内存占用异常时如何定位来源、判断是否持续增长 |
 | [macmini-as-cloud-server.md](./macmini-as-cloud-server.md) | Mac mini 常驻与内网穿透配置 |

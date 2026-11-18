@@ -1,6 +1,7 @@
 import asyncio
+import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.exception_handlers import request_validation_exception_handler
@@ -10,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from app import storage
 from app.config import get_settings
 from app.credentials import ModelCredentialsUnavailable
+from app.edits import segment
 from app.queue import close_queue
 from app.routers import (
     assets,
@@ -22,13 +24,35 @@ from app.routers import (
     sessions,
 )
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
+
+# SAM 会话闲置回收的检查间隔，远小于 TTL 即可，不必精确
+_REAP_INTERVAL = 60.0
+
+
+async def _reap_idle_segments() -> None:
+    """周期性释放闲置的点选会话，避免 SAM 的峰值内存长期占着不放。"""
+    while True:
+        await asyncio.sleep(_REAP_INTERVAL)
+        try:
+            await asyncio.to_thread(segment.release_idle)
+        except Exception:
+            # 回收失败不应影响服务本身，下一轮再试
+            logger.exception("释放点选会话失败")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await asyncio.to_thread(storage.ensure_bucket)
-    yield
+    reaper = asyncio.create_task(_reap_idle_segments())
+    try:
+        yield
+    finally:
+        reaper.cancel()
+        with suppress(asyncio.CancelledError):
+            await reaper
     await close_queue()
 
 
