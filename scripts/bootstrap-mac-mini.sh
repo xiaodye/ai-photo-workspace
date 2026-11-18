@@ -110,10 +110,23 @@ if mirror:
              "RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true",
              "RUN apt-get update",
          ])),
+        # uv.lock 给每个包记录的是 pypi 官方下载 URL，`--frozen` 会直接按这些 URL
+        # 下载，所以 UV_DEFAULT_INDEX 不起作用，必须在镜像内改写 lock 的地址
+        # （只改镜像内副本，仓库里的 uv.lock 不动；版本与 sha256 都不变，只换下载源）
         ("COPY backend/pyproject.toml backend/uv.lock ./",
          NL.join([
              "COPY backend/pyproject.toml backend/uv.lock ./",
-             "ENV UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple",
+             "RUN sed -i \\",
+             "      -e 's|https://files.pythonhosted.org/packages|https://mirrors.aliyun.com/pypi/packages|g' \\",
+             "      -e 's|https://pypi.org/simple|https://mirrors.aliyun.com/pypi/simple|g' \\",
+             "      uv.lock \\",
+             ' && echo "改写为国内源的 URL 行数: $(grep -c \'mirrors.aliyun.com\' uv.lock)"',
+         ])),
+        # 大 wheel 在家庭宽带上容易被默认 30s 超时打断；缓存挂载让重试不必从头下
+        ("RUN uv sync --frozen --all-extras --no-dev",
+         NL.join([
+             "ENV UV_HTTP_TIMEOUT=300 UV_CONCURRENT_DOWNLOADS=16",
+             "RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --all-extras --no-dev",
          ])),
     ]
     for old, new in subs:

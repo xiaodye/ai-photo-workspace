@@ -108,7 +108,7 @@ docker compose up -d postgres redis minio
 
 ```bash
 cd backend
-uv sync --all-extras --locked
+uv sync --all-extras --locked --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 uv run alembic upgrade head
 uv run python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 7302
 ```

@@ -58,7 +58,9 @@ PR ──push──▶ GitHub 托管 runner
   - `docker-compose.override.yml`：端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口（从 `docker-compose.override.example.yml` 复制后改占位符）
   - `Dockerfile.local`：apt / PyPI / npm 换国内源
 
-> 国内网络下构建必须用 `Dockerfile.local`：官方 `Dockerfile` 里的 `download.docker.com` 与 `deb.debian.org` 会超时或极慢。
+> 国内网络下构建必须用 `Dockerfile.local`：官方 `Dockerfile` 里的 `deb.debian.org` 会超时或极慢，`uv sync` 直连 pypi 源站实测只有 ~15 KB/s（阿里云镜像 ~9 MB/s），一个 250 MB 的依赖集要跑几个小时。
+
+> **为什么 PyPI 不能只靠环境变量换源**：`uv.lock` 给每个包记录的是 pypi 官方下载 URL（`files.pythonhosted.org`），`uv sync --frozen` 会直接按这些 URL 下载，`UV_DEFAULT_INDEX` / `--index-url` 都不会改变它们。所以 `Dockerfile.local` 是在镜像内用 `sed` 改写这份 lock 的副本（仓库里的 `uv.lock` 不动，版本和 sha256 校验值都不变，只换下载主机）。
 
 **这三个文件不存在时，部署会失败**（`docker compose` 会报 `env file .env not found`）。全新机器上一条命令生成：
 
@@ -73,7 +75,7 @@ cd ~/apps/ai-photo-workspace
 | --- | --- |
 | `.env` | 从 `.env.example` 复制，随机生成 `JWT_SECRET` 与 `CREDENTIAL_ENCRYPTION_KEY`，权限设 `600` |
 | `docker-compose.override.yml` | 从模板生成：端口只绑 `127.0.0.1`、使用 `Dockerfile.local` |
-| `Dockerfile.local` | 从 `Dockerfile` 生成并替换 3 处为国内源；**上游 Dockerfile 变动导致替换点找不到时会直接报错**，不会生成坏文件 |
+| `Dockerfile.local` | 从 `Dockerfile` 生成并替换 4 处为国内源；**上游 Dockerfile 变动导致替换点找不到时会直接报错**，不会生成坏文件 |
 | 自检 | 结尾跑 `docker compose config --quiet` |
 
 然后确认 `.env` 里这些值（`CREDENTIAL_ENCRYPTION_KEY` 已自动生成，不要改动）：
@@ -232,7 +234,7 @@ docker compose --profile deploy exec -T app alembic upgrade head
 | `Host key verification failed` | Mac Mini 重装或换了主机密钥 | 更新 workflow 里写死的 Ed25519 公钥 |
 | `403` / 登录页卡住 | Service Token 未加入 Access 策略，或 Action 选成了 `Allow` | 改为 `Service Auth` 策略 |
 | `/editor/smoke` 返回 404 | SPA fallback 未生效 | 先合并 `fix/spa-history-fallback` |
-| 构建超时 | 国内网络拉依赖慢 | 确认用的是 `Dockerfile.local`（国内源） |
+| 构建超时 / `uv sync` 卡在 Downloading | 国内直连 pypi 源站极慢（实测约 15 KB/s，阿里云镜像约 9 MB/s） | 确认用的是 `Dockerfile.local`，且日志里出现「改写为国内源的 URL 行数」；只设 `UV_DEFAULT_INDEX` 没用，见下方说明 |
 | 健康检查失败 | 容器起不来 / 迁移失败 | 日志里有 `docker compose logs --tail=60 app` 输出 |
 
 远程调试：
