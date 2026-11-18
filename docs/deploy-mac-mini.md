@@ -236,6 +236,8 @@ docker compose --profile deploy exec -T app alembic upgrade head
 | `/editor/smoke` 返回 404 | SPA fallback 未生效 | 先合并 `fix/spa-history-fallback` |
 | 构建超时 / `uv sync` 卡在 Downloading | 国内直连 pypi 源站极慢（实测约 15 KB/s，阿里云镜像约 9 MB/s） | 确认用的是 `Dockerfile.local`，且日志里出现「改写为国内源的 URL 行数」；只设 `UV_DEFAULT_INDEX` 没用，见下方说明 |
 | 健康检查失败 | 容器起不来 / 迁移失败 | 日志里有 `docker compose logs --tail=60 app` 输出 |
+| 拆分图层 / 抠图报「执行失败，请重试」 | worker 拿不到 rembg 权重，尝试现场下载又被 DNS 拦掉（`release-assets.githubusercontent.com` 被解析到 `127.0.0.1`） | 见下方「预置抠图模型」；同时确认 `MATTING_PROVIDER=auto`，此时会降级为四角抠图而不是整条任务失败 |
+| worker 容器被 SIGKILL（exit 137） | 权重太大，超过 Docker VM 内存（`bria-rmbg` 峰值约 7.7 GB） | 改用 `MATTING_MODEL=isnet-general-use`，或把 Docker Desktop 内存调到 12 GB 以上 |
 
 远程调试：
 
@@ -245,6 +247,44 @@ cd ~/apps/ai-photo-workspace
 docker compose --profile deploy ps
 docker compose --profile deploy logs --tail=80 app
 ```
+
+### 预置模型权重
+
+Mac Mini 所在网络会把 GitHub 的 release 资源域名解析到 `127.0.0.1`，容器里现场下载权重必然失败（`Connection refused`）。权重又必须持久化，否则每次重建镜像都会重下，所以：
+
+- `cv_models` 卷挂在 `/root/.rembg`，也就是 rembg 2.x 的默认家目录，权重统一放 `models/<模型名>/`，不需要额外设环境变量；
+- 首次部署在**能访问 GitHub 的机器**上下载一次，再拷进卷里；
+- 两个模型各管一段功能：`isnet-general-use` 用于拆分图层的抠图（worker），`sam` 用于画布点选（app）。
+
+```bash
+# 1. 在本地开发机下载（会缓存到 ~/.rembg/models/<模型名>/）
+cd backend
+uv run python -c 'from rembg import new_session; new_session("isnet-general-use")'
+uv run python -c 'from rembg import new_session; new_session("sam", sam_quant=True)'
+
+# 2. 拷到 Mac Mini（同局域网时直连 192.168.x.x 比走隧道快得多）
+scp ~/.rembg/models/isnet-general-use/isnet-general-use.onnx lansen@192.168.x.x:/tmp/
+scp ~/.rembg/models/sam/sam_vit_b_01ec64.encoder.quant.onnx \
+    ~/.rembg/models/sam/sam_vit_b_01ec64.decoder.quant.onnx lansen@192.168.x.x:/tmp/
+
+# 3. 放进卷里（容器在跑就行，app 和 worker 共用同一份）
+ssh macmini && cd ~/apps/ai-photo-workspace
+docker compose exec -T app mkdir -p /root/.rembg/models/isnet-general-use /root/.rembg/models/sam
+docker compose cp /tmp/isnet-general-use.onnx \
+  app:/root/.rembg/models/isnet-general-use/isnet-general-use.onnx
+docker compose cp /tmp/sam_vit_b_01ec64.encoder.quant.onnx \
+  app:/root/.rembg/models/sam/sam_vit_b_01ec64.encoder.quant.onnx
+docker compose cp /tmp/sam_vit_b_01ec64.decoder.quant.onnx \
+  app:/root/.rembg/models/sam/sam_vit_b_01ec64.decoder.quant.onnx
+
+# 4. 自检：不调用任何收费接口，只验证权重能加载
+docker compose exec -T worker /app/backend/.venv/bin/python \
+  -c 'from rembg import new_session; print(new_session("isnet-general-use"))'
+docker compose exec -T app /app/backend/.venv/bin/python \
+  -c 'from rembg import new_session; print(new_session("sam", sam_quant=True))'
+```
+
+换权重只需要改 `MATTING_MODEL` 并按上面的路径重新拷一份；`bria-rmbg` 质量更好，但 1 GB 权重峰值约 7.7 GB 内存，8 GB 的 Docker VM 跑不动。
 
 ## 安全模型
 
