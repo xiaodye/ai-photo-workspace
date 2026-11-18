@@ -1,5 +1,7 @@
+import gc
 import hashlib
 import io
+import time
 from collections import OrderedDict
 from threading import Lock
 
@@ -9,7 +11,12 @@ from app.config import get_settings
 from app.edits.mask import overlay_png
 
 _CACHE_LIMIT = 4
+# SAM 会话闲置超过该时长就释放，把峰值内存（实测约 3.5GB）还给系统
+_IDLE_SECONDS = 600.0
 _lock = Lock()
+# 正在推理的调用数：释放只在完全空闲时进行，避免把别的线程正在用的会话关掉
+_busy = 0
+_last_used = 0.0
 _embeddings: OrderedDict[str, object] = OrderedDict()
 _sam = None
 
@@ -20,7 +27,8 @@ def warm_embedding(image: bytes) -> None:
         return
     source = Image.open(io.BytesIO(image)).convert("RGB")
     try:
-        _embedding_of(_sam_session(), image, source)
+        with _in_use():
+            _embedding_of(_sam_session(), image, source)
     except Exception:
         if get_settings().matting_provider == "rembg":
             raise
@@ -36,12 +44,43 @@ def segment_points(image: bytes, points: list[tuple[float, float]]) -> bytes:
         mask = _circles(source.size, points)
     else:
         try:
-            mask = _sam_mask(source, image, points)
+            with _in_use():
+                mask = _sam_mask(source, image, points)
         except Exception:
             if get_settings().matting_provider == "rembg":
                 raise
             mask = _circles(source.size, points)
     return overlay_png(mask)
+
+
+def release_idle(ttl: float = _IDLE_SECONDS) -> bool:
+    """闲置超过 ttl 秒时释放 SAM 会话与 embedding 缓存，返回是否真的释放了。"""
+    global _sam
+    with _lock:
+        if _sam is None or _busy or time.monotonic() - _last_used < ttl:
+            return False
+        _sam = None
+        _embeddings.clear()
+    # gc 要在锁外跑：回收大对象耗时，别阻塞正在排队的请求
+    gc.collect()
+    return True
+
+
+class _in_use:
+    """标记一次推理占用，期间禁止释放会话。"""
+
+    def __enter__(self):
+        global _busy, _last_used
+        with _lock:
+            _busy += 1
+            _last_used = time.monotonic()
+
+    def __exit__(self, *exc):
+        global _busy, _last_used
+        with _lock:
+            _busy -= 1
+            _last_used = time.monotonic()
+        return False
 
 
 def _circles(size: tuple[int, int], points: list[tuple[float, float]]) -> Image.Image:
@@ -64,13 +103,22 @@ def _sam_mask(source: Image.Image, raw: bytes, points: list[tuple[float, float]]
     return _decode(session, embedding, prompt)
 
 
+def _session_options():
+    """关掉 ORT 的 CPU 内存池：否则每换一张画布内存就涨一档，实测会从 3.5GB 涨到 6.6GB。"""
+    import onnxruntime as ort
+
+    options = ort.SessionOptions()
+    options.enable_cpu_mem_arena = False
+    return options
+
+
 def _sam_session():
     global _sam
     with _lock:
         if _sam is None:
             from rembg.session_factory import new_session
 
-            _sam = new_session("sam", sam_quant=True)
+            _sam = new_session("sam", sam_quant=True, sess_opts=_session_options())
         return _sam
 
 

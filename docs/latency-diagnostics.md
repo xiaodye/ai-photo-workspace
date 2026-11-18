@@ -2,7 +2,7 @@
 
 线上访问慢时，如何判断瓶颈在**代码**、在**服务器**、还是在**网络链路**。
 
-本文只讲测量方法和判读标准，不绑定具体优化结论。项目部署方式见 [deploy-mac-mini.md](./deploy-mac-mini.md)，机器常驻配置见 [macmini-as-cloud-server.md](./macmini-as-cloud-server.md)。
+本文只讲测量方法和判读标准，不绑定具体优化结论。项目部署方式见 [deploy-mac-mini.md](./deploy-mac-mini.md)，机器常驻配置见 [macmini-as-cloud-server.md](./macmini-as-cloud-server.md)。如果服务端本身就慢，先按 [container-memory-diagnostics.md](./container-memory-diagnostics.md) 排除容器内存被吃满（内存不足会触发换页，表现为整机变慢）。
 
 > 文中所有数字来自 2026-11-17 对该项目 Cloudflare Tunnel 部署的实测，仅作基线参考。
 
