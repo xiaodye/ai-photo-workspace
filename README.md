@@ -144,6 +144,7 @@ pnpm dev
 | `DASHSCOPE_API_KEY` / `DASHSCOPE_BASE_URL`                   | 平台兜底用的 Key（仅在开关打开时生效）与模型服务地址。                                                             |
 | `TEXT_TO_IMAGE_MODEL` / `IMAGE_EDIT_MODEL` / `PLANNER_MODEL` | 用户未填写模型名时的默认值，同时用于设置面板预填。                                                                 |
 | `MATTING_PROVIDER`                                           | `auto` 优先使用 rembg，失败时降级；`rembg` 强制使用模型并在失败时报错；`corner` 使用简化处理，不代表真实模型效果。 |
+| `MATTING_MODEL`                                              | rembg 权重名，默认 `isnet-general-use`（约 180 MB、峰值约 1 GB）；`bria-rmbg` 效果更好但需 8 GB 以上内存。 |
 | `OCR_PROVIDER`                                               | `auto` 尝试使用 RapidOCR 识别文字，不可用时跳过；`none` 不拆分文字层。                                             |
 | `DATABASE_URL` / `REDIS_URL` / `S3_*`                        | 数据库、任务队列与对象存储连接配置；`S3_PUBLIC_ENDPOINT` 用于浏览器访问签名图片 URL。                              |
 | `JWT_SECRET` / `JWT_TTL_HOURS`                               | 登录态签名密钥与有效期；生产环境必须更换默认密钥。                                                                 |

@@ -64,7 +64,8 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:7313}
     volumes:
-      - cv_models:/root/.u2net
+      # rembg 2.x 把权重写在 ~/.rembg/models/<模型名>/，挂到这里才能跨镜像重建保留
+      - cv_models:/root/.rembg
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -82,7 +83,8 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:7313}
     volumes:
-      - cv_models:/root/.u2net
+      # 与 app 共用同一份权重，重建镜像不必重新下载
+      - cv_models:/root/.rembg
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

@@ -1,16 +1,30 @@
 import io
+import logging
 import math
+from functools import lru_cache
+from typing import cast
 
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter
+
+logger = logging.getLogger(__name__)
 
 _CORNER_TOLERANCE = 28
 
 
+@lru_cache(maxsize=2)
+def _rembg_session(model: str):
+    """缓存推理会话：权重动辄上百 MB，每次抠图都重新加载既慢又容易顶爆内存。"""
+    from rembg import new_session
+
+    return new_session(model)
+
+
 def remove_background(data: bytes) -> bytes:
-    """auto 模式下优先 rembg；corner 仅用四角颜色，避免测试下载模型。"""
+    """auto 模式下优先 rembg，模型不可用（未安装、缺权重、内存不足）时降级四角抠图。"""
     from app.config import get_settings
 
-    provider = get_settings().matting_provider
+    settings = get_settings()
+    provider = settings.matting_provider
     if provider != "corner":
         try:
             from rembg import remove
@@ -18,7 +32,15 @@ def remove_background(data: bytes) -> bytes:
             if provider == "rembg":
                 raise
         else:
-            return bytes(remove(data))
+            try:
+                session = _rembg_session(settings.matting_model)
+                # 入参是 bytes 且显式要求 bytes 输出；rembg 的签名是联合类型，这里收窄
+                return cast(bytes, remove(data, session=session, force_return_bytes=True))
+            except Exception:
+                # 离线部署下权重缺失且无法下载是常态，降级比让整条任务失败更可控
+                if provider == "rembg":
+                    raise
+                logger.warning("rembg 抠图失败，降级为四角抠图", exc_info=True)
     return _corner_matte(data)
 
 
