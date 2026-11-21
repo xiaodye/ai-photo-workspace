@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2048" height="1152" viewBox="0 0 2048 1152" fill="none">
-  <title>AI 修图工作台 · 技术栈全景图</title>
+  <title>AI 营销素材工作台 · 技术栈全景图</title>
   <desc>白底淡绿色设计，展示后端开发、前端和画布、智能体与模型、图像处理、异步和通信、数据和部署六个技术分类。</desc>
   <defs>
     <style>
@@ -24,7 +24,7 @@
 
   <rect width="2048" height="1152" fill="#f7faf7"/>
   <rect x="60" y="65" width="6" height="65" rx="3" fill="#75a88a"/>
-  <text x="90" y="112" class="title">AI 修图工作台</text>
+  <text x="90" y="112" class="title">AI 营销素材工作台</text>
   <text x="90" y="153" class="subtitle">技术栈全景图 / TECHNOLOGY STACK</text>
   <path d="M60 188H1988" stroke="#dce7df" stroke-width="1.5"/>
 

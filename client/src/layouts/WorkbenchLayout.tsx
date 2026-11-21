@@ -43,7 +43,7 @@ export default function WorkbenchLayout() {
           <Link to="/" aria-label="返回落地页" title="返回落地页" className="mb-6 block px-5">
             <BrandMark size="sm">
               <span className="text-ink truncate text-sm font-semibold opacity-0 transition-opacity group-data-[nav-open=true]:opacity-100 group-data-[account-open=true]:opacity-100">
-                AI 修图智能体
+                AI 营销素材工作台
               </span>
             </BrandMark>
           </Link>
