@@ -1,19 +1,31 @@
 import { Link } from 'react-router-dom'
 
 import BrandMark from '@/components/BrandMark'
+import GithubIcon from '@/components/GithubIcon'
 import ThemeSwitcher from '@/components/ThemeSwitcher'
+import { GITHUB_URL } from '@/lib/links'
 
 export default function LandingHeader({ account }: { account: string | null }) {
   return (
     <header className="border-line/70 bg-canvas/80 sticky top-0 z-10 border-b backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
-        <Link to="/" aria-label="AI 修图智能体首页">
+        <Link to="/" aria-label="AI 营销素材工作台首页">
           <BrandMark size="sm">
-            <span className="text-ink text-sm font-semibold">AI 修图智能体</span>
+            <span className="text-ink text-sm font-semibold">AI 营销素材工作台</span>
           </BrandMark>
         </Link>
 
         <div className="flex items-center gap-3">
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="GitHub 仓库"
+            aria-label="在 GitHub 上查看源码"
+            className="border-line bg-soft text-muted hover:text-ink rounded-control grid size-10 shrink-0 place-items-center border transition-colors"
+          >
+            <GithubIcon size={18} />
+          </a>
           <ThemeSwitcher />
           {account ? (
             <Link

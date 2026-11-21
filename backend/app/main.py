@@ -57,7 +57,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(
-    title="AI 修图智能体",
+    title="AI 营销素材工作台",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,

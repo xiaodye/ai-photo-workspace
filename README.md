@@ -1,8 +1,8 @@
 <div align="center">
 
-# AI 修图工作台
+# AI 营销素材工作台
 
-基于 FastAPI + LangGraph 与 React 19 + Konva 的全栈修图应用。用户输入一句自然语言，Agent 自动分析需求、规划修图步骤，然后逐步调用编辑工具执行——抠图、调色、区域编辑、图层拆分全部自动完成。前端提供支持缩放平移、图层文档、撤销重做的专业画布编辑器，所有长任务通过 ARQ 队列异步执行，Redis Pub/Sub + SSE 实时推送进度。
+基于 FastAPI + LangGraph 与 React 19 + Konva 的全栈营销素材工作台。用户输入一句自然语言，Agent 自动分析需求、规划编辑步骤，然后逐步调用工具执行——抠图、调色、区域编辑、图层拆分全部自动完成。前端提供支持缩放平移、图层文档、撤销重做的专业画布编辑器，所有长任务通过 ARQ 队列异步执行，Redis Pub/Sub + SSE 实时推送进度。
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev)
@@ -255,3 +255,5 @@ Dockerfile           多阶段构建：前端构建 → 后端同源托管
 ## 许可证
 
 当前仓库尚未包含 `LICENSE` 文件，原 README 中的 MIT 声明缺少对应的许可证文本。使用、修改或分发前，请核实上游项目的许可证与版权归属，并补齐适用的许可证及第三方声明。
+
+本项目基于 [yuyuanweb/ai-picture-editor](https://github.com/yuyuanweb/ai-picture-editor) 改造而来。
