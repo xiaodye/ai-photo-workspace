@@ -56,7 +56,7 @@ PR ──push──▶ GitHub 托管 runner
 - 部署目录 `~/apps/ai-photo-workspace`，其中包含三个**本地配置文件**（`rsync` 时被排除，不会被覆盖或删除）：
   - `.env`：生产环境变量（从 `.env.example` 复制后填真实值）
   - `docker-compose.override.yml`：端口收敛、`S3_PUBLIC_ENDPOINT`、构建入口（从 `docker-compose.override.example.yml` 复制后改占位符）
-  - `Dockerfile.local`：apt / PyPI / npm 换国内源
+  - `Dockerfile.local`：apt / PyPI / npm / uv 镜像换国内源
 
 > 国内网络下构建必须用 `Dockerfile.local`：官方 `Dockerfile` 里的 `deb.debian.org` 会超时或极慢，`uv sync` 直连 pypi 源站实测只有 ~15 KB/s（阿里云镜像 ~9 MB/s），一个 250 MB 的依赖集要跑几个小时。
 
@@ -75,7 +75,7 @@ cd ~/apps/ai-photo-workspace
 | --- | --- |
 | `.env` | 从 `.env.example` 复制，随机生成 `JWT_SECRET` 与 `CREDENTIAL_ENCRYPTION_KEY`，权限设 `600` |
 | `docker-compose.override.yml` | 从模板生成：端口只绑 `127.0.0.1`、使用 `Dockerfile.local` |
-| `Dockerfile.local` | 从 `Dockerfile` 生成并替换 4 处为国内源；**上游 Dockerfile 变动导致替换点找不到时会直接报错**，不会生成坏文件 |
+| `Dockerfile.local` | 从 `Dockerfile` 生成并替换 5 处为国内源（npm / uv 镜像 / apt / PyPI / uv 缓存）；**上游 Dockerfile 变动导致替换点找不到时会直接报错**，不会生成坏文件 |
 | 自检 | 结尾跑 `docker compose config --quiet` |
 
 然后确认 `.env` 里这些值（`CREDENTIAL_ENCRYPTION_KEY` 已自动生成，不要改动）：
