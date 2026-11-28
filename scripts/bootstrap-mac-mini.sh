@@ -104,6 +104,8 @@ if mirror:
     subs = [
         ("RUN npm install --global pnpm@11.23.0",
          "RUN npm install --global pnpm@11.23.0 && pnpm config set registry https://registry.npmmirror.com"),
+        ("COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv",
+         "COPY --from=ghcr.1ms.run/astral-sh/uv:latest /uv /usr/local/bin/uv"),
         ("RUN apt-get update",
          NL.join([
              "RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true",
